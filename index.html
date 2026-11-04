@@ -7,7 +7,7 @@
 <style>
 :root{--panel:rgba(14,15,22,.74);--ink:#ece6d8;--ink-soft:rgba(236,230,216,.62);--line:rgba(236,230,216,.14);--gold:#e8a838;--chip:rgba(236,230,216,.08)}
 html,body{margin:0;height:100%;background:#0b0c10;color:var(--ink);font-family:Figtree,system-ui,-apple-system,sans-serif;overflow:hidden;-webkit-tap-highlight-color:transparent}
-#c{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);display:block;image-rendering:pixelated;image-rendering:crisp-edges}
+#c{position:fixed;left:0;top:0;width:100vw;height:100vh;display:block;image-rendering:pixelated;image-rendering:crisp-edges}
 /* Ausstellungsmodus (Standard): nur das Bild, keine Steuerung, kein Mauszeiger, keine Berührungsgesten. Test-Modus mit ?dev=1 */
 body:not(.dev){cursor:none;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 body:not(.dev) #panel,body:not(.dev) #fps{display:none}
@@ -37,7 +37,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
   <div class="row" id="tnrow"><button data-tonne="" class="on">Echt</button></div>
   <div class="lbl">Szenen</div>
   <div class="row"><button data-scene="monkey">🐒 Affe</button><button data-scene="butter">🦋 Schmetterlinge</button><button data-scene="rain">🌈 Regenbogen + Einhorn</button><button data-scene="night">🌙 Gute Nacht</button><button data-scene="hat">👒 Hut lüften</button><button data-scene="ducks">🦆 Enten</button></div>
-  <div class="hint">Tipp aufs Bild blendet die Steuerung aus. Zeit simulieren mit ?t=2026-12-24T17:30, Wetter erzwingen mit ?wetter=regen|kalt|sonne.</div>
+  <div class="hint">Ohne ?dev=1: 3 Sekunden aufs Bild drücken blendet diese Leiste ein und aus. Mit ?dev=1: Tipp aufs Bild blendet sie aus. Zeit simulieren mit ?t=2026-12-24T17:30, Wetter erzwingen mit ?wetter=regen|kalt|sonne.</div>
 </div>
 <script>
 // =====================================================================
@@ -46,8 +46,11 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 // =====================================================================
 
 // ---------- Grundlagen ----------
-const W=540,H=960,HORIZON=362;      // Bildraum des Fotos (9:16); alle Szenen rechnen darin
-const COLS=90,ROWS=160,CS=6;         // festes Raster wie in der Vorlage: 90×160 Zellen, 6 Bildpunkte pro Zelle
+const W=540,H=960,HORIZON=362;      // Foto-Koordinaten (9:16): alle Positionen im Bild rechnen darin, unabhängig vom Raster
+const SS=2;                          // das Foto wird mit doppelter Auflösung (1080×1920) abgetastet, damit auch feine Raster saubere Blockmittel bekommen
+// Raster: passt sich dem Bildschirm an (wie Lichtzeit). COLS/ROWS = Zellen, CP = Bildschirmpixel je Zelle, GP = Fuge,
+// Z = Vergrößerung von Uhr, Temperatur, Symbolen und Lichterkette (ganzzahlig), ZF = Vergrößerung der Figuren (im Verhältnis zum Bild mindestens wie bei 90 Spalten)
+let COLS=108,ROWS=180,CP=10,GP=1,Z=1,ZF=1.2;
 const rad=Math.PI/180,TAU=Math.PI*2;
 const lerp=(a,b,t)=>a+(b-a)*t,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const smooth=t=>{t=clamp(t,0,1);return t*t*(3-2*t)};
@@ -225,7 +228,9 @@ const SPR={
   monkA:["..mm..",".mmmm.",".FkFk.","..FF..","mmmmmm","m.mm.m","..mm..",".m..m."],monkB:["..mm..",".mmmm.",".FkFk.","..FF..","mmmmmm","m.mm.m","..mm..","..mm.."],
   flower:[".p.","pYp",".p.",".g.",".g."],
   uniA:[".....G.","...pww.","..pwwww","pwwww..","pwwww..",".w..w.."],uniB:[".....G.","...pww.","..pwwww","pwwww..","pwwww..","w...w.."],
-  moon:[".SSS.","SSSSS","SSSSS","SSSSS",".SSS."]};
+  moon:[".SSS.","SSSSS","SSSSS","SSSSS",".SSS."],
+  // Schmetterlinge (Farbe c/l je Tier über eine Palette): offen und geschlossen, großer Besucher und kleiner Feld-Schmetterling
+  butO:[".....","ccBcc","ccBcc",".lBl."],butC:[".c.c.",".cBc.","..B..","..B.."],fbO:["...","cBc"],fbC:[".c.",".B."]};
 const COL={W:[244,242,234],B:[150,112,76],O:[236,150,50],F:[206,178,148],Y:[246,214,90],K:[60,56,50],R:[214,62,52],T:[40,110,120],H:[24,52,60],w:[230,240,250],
   k:[38,30,26],m:[124,104,82],p:[244,140,186],g:[96,156,72],G:[248,206,84],S:[250,246,226]};
 const RAINBOW=[[230,70,70],[244,150,60],[246,222,90],[110,200,100],[90,160,240],[110,100,220],[170,110,220]];
@@ -234,32 +239,42 @@ const HATV={ax:383,ay:576,brim:636,hw:67,by:650,hair:{cx:385,cy:652,rx:40,ry:30}
 const HATM={ax:306,ay:286,brim:328,hw:56,by:340,hair:{cx:309,cy:344,rx:38,ry:22}};
 function inHat(h,x,y){if(y<h.ay||y>h.by)return false;const hw=y<h.brim?(y-h.ay)/(h.brim-h.ay)*h.hw+3:h.hw;return Math.abs(x-h.ax)<=hw}
 
-// ---------- Anzeige: Rastergröße passt sich dem Bildschirm an (Muse 4K hochkant: 24 Bildpunkte je Zelle, 2 Fuge) ----------
+// ---------- Anzeige: Raster wie bei Lichtzeit automatisch an die Fläche angepasst, randlos füllend ----------
+// Zellgröße = kurze Bildschirmseite / 108, gerundet (Muse Frame 1080×1800: 10 px → 108×180 Zellen; 4K mit doppelter Pixeldichte: 20 px → ebenfalls 108×180).
+// Das Canvas deckt den ganzen Bildschirm; der Rest unter einer Zelle verteilt sich unsichtbar auf alle Zellen.
 const canvas=$('c'),ctx=canvas.getContext('2d');
-let CP=12,GP=1,grid=null;
-function fit(){const dpr=window.devicePixelRatio||1,PW=innerWidth*dpr,PH=innerHeight*dpr;
-  CP=ANZ.raster_px>0?ANZ.raster_px:Math.max(3,Math.floor(Math.min(PW/COLS,PH/ROWS)));GP=Math.max(1,Math.round(CP/12));
-  canvas.width=COLS*CP;canvas.height=ROWS*CP;canvas.style.width=(canvas.width/dpr)+'px';canvas.style.height=(canvas.height/dpr)+'px';
-  grid=new Path2D();for(let i=1;i<=COLS;i++)grid.rect(i*CP-GP,0,GP,canvas.height);for(let j=1;j<=ROWS;j++)grid.rect(0,j*CP-GP,canvas.width,GP);}
-addEventListener('resize',fit);fit();
+let grid=null,BILD=null;
+function fit(){const dpr=window.devicePixelRatio||1,PW=Math.max(1,Math.round(innerWidth*dpr)),PH=Math.max(1,Math.round(innerHeight*dpr));
+  CP=ANZ.raster_px>0?ANZ.raster_px:Math.max(3,Math.round(Math.min(PW,PH)/108));GP=Math.max(1,Math.round(CP/12));
+  COLS=Math.max(12,Math.floor(PW/CP));ROWS=Math.max(12,Math.floor(PH/CP));
+  Z=Math.max(1,Math.round(COLS/100));ZF=Math.max(1,COLS/90);
+  canvas.width=COLS*CP;canvas.height=ROWS*CP;
+  grid=new Path2D();for(let i=1;i<=COLS;i++)grid.rect(i*CP-GP,0,GP,canvas.height);for(let j=1;j<=ROWS;j++)grid.rect(0,j*CP-GP,canvas.width,GP);
+  if(draw)draw=BILD?build(BILD.col,BILD.msk):leer();}
+let fitT=0;addEventListener('resize',()=>{clearTimeout(fitT);fitT=setTimeout(fit,250);});
 
 // ---------- Engine (aus der Vorlage): Grundfarben, Wind, Wolken, Glitzern, Gags, Lichtwellen, Nacht-Dither ----------
 function engine(col,msk,cfg){
-  const cs=CS,cols=COLS,rows=ROWS;
-  const maskAt=(x,y)=>msk[((clamp(y/3|0,0,319))*180+clamp(x/3|0,0,179))*4]/255;
-  const colAt=(x,y)=>{const i=((clamp(y|0,0,H-1))*W+clamp(x|0,0,W-1))*4;return[col[i],col[i+1],col[i+2]]};
+  const cols=COLS,rows=ROWS,F=ZF;
+  // Foto „cover“: die Breite füllt das Raster, oben und unten wird minimal beschnitten. s = Zellen je Foto-Einheit
+  const s=Math.max(cols/W,rows/H),ox=(W-cols/s)/2,oy=(H-rows/s)/2;
+  const ci=x=>(x-ox)*s,cj=y=>(y-oy)*s,px=i=>ox+i/s,py=j=>oy+j/s;
+  const SW=W*SS,SH=H*SS;
+  const maskAt=(x,y)=>msk[((clamp(y|0,0,H-1))*W+clamp(x|0,0,W-1))*4]/255;
+  const colAt=(x,y)=>{const i=((clamp(y*SS|0,0,SH-1))*SW+clamp(x*SS|0,0,SW-1))*4;return[col[i],col[i+1],col[i+2]]};
   const N=cols*rows,base=new Float32Array(N*3),fam=new Uint8Array(N),kind=new Uint8Array(N);
-  // Blockmittel aus dem Foto, leicht gedämpft wie Lichtzeit
-  for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){let r=0,g=0,b=0,n=0;
-    for(let y=j*cs;y<(j+1)*cs;y+=1)for(let xx=i*cs;xx<(i+1)*cs;xx+=1){const k=((clamp(y,0,H-1))*W+clamp(xx,0,W-1))*4;r+=col[k];g+=col[k+1];b+=col[k+2];n++}
-    r/=n;g/=n;b/=n;const m=(r+g+b)/3,o=(j*cols+i)*3;
-    base[o]=lerp(r,m,.12)*.97+6;base[o+1]=lerp(g,m,.12)*.97+6;base[o+2]=lerp(b,m,.12)*.97+8;
-    const cx=i*cs+cs/2,cy=j*cs+cs/2,f=maskAt(cx,cy)>.5;fam[j*cols+i]=f?1:0;
-    kind[j*cols+i]=f?1:(cy<HORIZON?2:3);}
+  // Blockmittel aus dem Foto (jede Zelle mittelt ihren Ausschnitt), leicht gedämpft wie Lichtzeit
+  for(let j=0;j<rows;j++){const y0=clamp(Math.floor(py(j)*SS),0,SH-1),y1=clamp(Math.ceil(py(j+1)*SS)-1,y0,SH-1);
+    for(let i=0;i<cols;i++){let r=0,g=0,b=0,n=0;const x0=clamp(Math.floor(px(i)*SS),0,SW-1),x1=clamp(Math.ceil(px(i+1)*SS)-1,x0,SW-1);
+      for(let y=y0;y<=y1;y++)for(let xx=x0;xx<=x1;xx++){const k=(y*SW+xx)*4;r+=col[k];g+=col[k+1];b+=col[k+2];n++}
+      r/=n;g/=n;b/=n;const m=(r+g+b)/3,o=(j*cols+i)*3;
+      base[o]=lerp(r,m,.12)*.97+6;base[o+1]=lerp(g,m,.12)*.97+6;base[o+2]=lerp(b,m,.12)*.97+8;
+      const cx=px(i+.5),cy=py(j+.5),f=maskAt(cx,cy)>.5;fam[j*cols+i]=f?1:0;
+      kind[j*cols+i]=f?1:(cy<HORIZON?2:3);}}
   // Wasser in den Terrassen: helle, graue Zellen glitzern
   const glints=[];{const r=rng(cfg.seed||1);for(let k=0;k<N;k++){if(kind[k]!==3)continue;const o=k*3,L=(base[o]+base[o+1]+base[o+2])/3;if(L>165&&Math.abs(base[o]-base[o+2])<22&&r()<.5)glints.push({k,ph:r()*6.28,f:lerp(.5,1.4,r())})}}
   // Wolken: weiches Rauschen, das langsam zieht
-  const NW=cols*3,NH=Math.ceil(HORIZON/cs)+2,noise=new Float32Array(NW*NH);
+  const NW=cols*3,NH=Math.max(2,Math.ceil(cj(HORIZON)))+2,noise=new Float32Array(NW*NH);
   {const r=rng(cfg.seed+7),g=cv(Math.ceil(NW/10),Math.ceil(NH/6)),gx=g.getContext('2d'),d=gx.createImageData(g.width,g.height);
    for(let i=0;i<d.data.length;i+=4){const v=r()*255;d.data[i]=d.data[i+1]=d.data[i+2]=v;d.data[i+3]=255}gx.putImageData(d,0,0);
    const big=cv(NW,NH),bx=big.getContext('2d',{willReadFrequently:true});bx.imageSmoothingEnabled=true;bx.imageSmoothingQuality='high';bx.drawImage(g,0,0,NW,NH);
@@ -267,7 +282,7 @@ function engine(col,msk,cfg){
    bx.globalAlpha=.4;bx.drawImage(g2,0,0,NW,NH);const nd=bx.getImageData(0,0,NW,NH).data;for(let i=0;i<NW*NH;i++)noise[i]=nd[i*4]/255}
   const noiseAt=(fx,j)=>{const x0=Math.floor(fx),f=fx-x0,a=noise[j*NW+((x0%NW)+NW)%NW],b=noise[j*NW+(((x0+1)%NW)+NW)%NW];return a+(b-a)*f};
   // Hutzellen + was darunter liegt
-  const hatCells=h=>{const L=[];for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){const cx=i*cs+cs/2,cy=j*cs+cs/2;if(inHat(h,cx,cy)&&fam[j*cols+i]){
+  const hatCells=h=>{const L=[];for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){const cx=px(i+.5),cy=py(j+.5);if(inHat(h,cx,cy)&&fam[j*cols+i]){
     const e=((cx-h.hair.cx)/h.hair.rx)**2+((cy-h.hair.cy)/h.hair.ry)**2;
     const L0=colAt(h.ax-h.hw-8,cy),R0=colAt(h.ax+h.hw+8,cy),k=clamp((cx-(h.ax-h.hw))/(2*h.hw),0,1);
     const vr=((i*7+j*13)%5-2)*9,under=e<1?(h===HATV?[206+vr,168+vr,104+vr*.6]:[66+vr*.5,48+vr*.5,38]):(h===HATV?mix(L0,R0,k):colAt(cx,h.ay-14));
@@ -276,15 +291,27 @@ function engine(col,msk,cfg){
   // Puffer
   const cr=new Float32Array(N*3),buf=cv(cols,rows),bx=buf.getContext('2d'),bimg=bx.createImageData(cols,rows),bu=new Uint32Array(bimg.data.buffer);
   const dist=new Float32Array(N),glow=new Float32Array(N*4);let lastL='';
-  const S={cs,cols,rows,cr,fam,kind,base,
+  // Figuren: jeder Figurenpunkt deckt ceil-gerundet F Zellen, so bleibt eine Figur im Verhältnis zum Bild mindestens so groß wie bei 90 Spalten
+  const fs0=c=>Math.ceil(c*F),fs1=c=>Math.ceil((c+1)*F);
+  const S={cols,rows,cr,fam,kind,base,ci,cj,px,py,s,F,Z,hc:Math.floor(cols/Z),hr:Math.floor(rows/Z),
+    sz:(n,z=1)=>Math.ceil(n*z*F),                         // Größe von n Figurenpunkten in Zellen
     put(i,j,c,a=1,behind=false){i=Math.round(i);j=Math.round(j);if(i<0||j<0||i>=cols||j>=rows)return;if(behind&&fam[j*cols+i])return;const o=(j*cols+i)*3;cr[o]=lerp(cr[o],c[0],a);cr[o+1]=lerp(cr[o+1],c[1],a);cr[o+2]=lerp(cr[o+2],c[2],a)},
-    sprite(name,i,j,a=1,flip=false,front=false,z=1){const s=SPR[name],w=s[0].length;i=Math.round(i);j=Math.round(j);for(let r=0;r<s.length;r++)for(let c=0;c<w;c++){const ch=s[r][flip?w-1-c:c];if(ch!=='.')for(let q=0;q<z*z;q++)S.put(i+c*z+(q%z),j+r*z+((q/z)|0),COL[ch],a,!front)}},
+    // ein Figurenpunkt (dx,dy) relativ zum Anker (i,j), auf Figurengröße gebracht
+    fput(i,j,dx,dy,c,a=1,behind=false){i=Math.round(i);j=Math.round(j);for(let y=fs0(dy);y<fs1(dy);y++)for(let x=fs0(dx);x<fs1(dx);x++)S.put(i+x,j+y,c,a,behind)},
+    sprite(name,i,j,a=1,flip=false,front=false,z=1,pal=null){const sp=Array.isArray(name)?name:SPR[name],w=sp[0].length,zz=z*F;i=Math.round(i);j=Math.round(j);
+      for(let r=0;r<sp.length;r++){const y0=Math.ceil(r*zz),y1=Math.ceil((r+1)*zz);for(let c=0;c<w;c++){const ch=sp[r][flip?w-1-c:c];if(ch==='.')continue;const cc=(pal&&pal[ch])||COL[ch],x0=Math.ceil(c*zz),x1=Math.ceil((c+1)*zz);
+        for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)S.put(i+x,j+y,cc,a,!front)}}},
     hat(L,dy,dx=0){if(!dy&&!dx)return;const tmp=L.map(h=>{const o=h.k*3;return[cr[o],cr[o+1],cr[o+2]]});
       for(const h of L){const o=h.k*3;cr[o]=h.under[0];cr[o+1]=h.under[1];cr[o+2]=h.under[2]}
       L.forEach((h,n)=>S.put(h.i+dx,h.j-dy,tmp[n]))},
     glow(i,j,c,a=1,behind=false){i=Math.round(i);j=Math.round(j);if(i<0||j<0||i>=cols||j>=rows||a<=0)return;const k=j*cols+i;if(behind&&fam[k])return;const o=k*4;if(a>=glow[o+3]){glow[o]=c[0];glow[o+1]=c[1];glow[o+2]=c[2];glow[o+3]=Math.min(1,a)}},
-    glowSprite(name,i,j,a=1,flip=false,front=false){const s=SPR[name],w=s[0].length;for(let r=0;r<s.length;r++)for(let c=0;c<w;c++){const ch=s[r][flip?w-1-c:c];if(ch!=='.')S.glow(i+c,j+r,COL[ch],a,!front)}},
-    region(test,underFn){const L=[];for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){const k=j*cols+i;if(fam[k]&&test(i*cs+cs/2,j*cs+cs/2))L.push({i,j,k,under:underFn(i,j)})}return L},
+    glowSprite(name,i,j,a=1,flip=false,front=false,z=1){const sp=SPR[name],w=sp[0].length,zz=z*F;i=Math.round(i);j=Math.round(j);
+      for(let r=0;r<sp.length;r++){const y0=Math.ceil(r*zz),y1=Math.ceil((r+1)*zz);for(let c=0;c<w;c++){const ch=sp[r][flip?w-1-c:c];if(ch==='.')continue;const x0=Math.ceil(c*zz),x1=Math.ceil((c+1)*zz);
+        for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)S.glow(i+x,j+y,COL[ch],a,!front)}}},
+    // Uhr, Temperatur, Symbole, Lichterkette: Z×Z Zellen je Punkt, Koordinaten in Anzeigepunkten
+    blk(i,j,c,a=1,behind=false){i=Math.round(i)*Z;j=Math.round(j)*Z;for(let y=0;y<Z;y++)for(let x=0;x<Z;x++)S.put(i+x,j+y,c,a,behind)},
+    glowBlk(i,j,c,a=1,behind=false){i=Math.round(i)*Z;j=Math.round(j)*Z;for(let y=0;y<Z;y++)for(let x=0;x<Z;x++)S.glow(i+x,j+y,c,a,behind)},
+    region(test,underFn){const L=[];for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){const k=j*cols+i;if(fam[k]&&test(px(i+.5),py(j+.5)))L.push({i,j,k,under:underFn(i,j)})}return L},
     HV,HM};
   {let r=0,g=0,b=0;for(let k=0;k<N;k++){r+=base[k*3];g+=base[k*3+1];b+=base[k*3+2]}S.gridCol=[r/N*.5|0,g/N*.5|0,b/N*.55|0]}
   cfg.init&&cfg.init(S);
@@ -292,10 +319,10 @@ function engine(col,msk,cfg){
     const look=cfg.look(S,ts);
     // 1) Grundfarben + Wind + Wolken
     const gpos=((ts%11)/11)*(W*1.6+400)-200;
-    for(let j=0;j<rows;j++){const y=j*cs;const dep=smooth((y-HORIZON)/560);
+    for(let j=0;j<rows;j++){const y=py(j);const dep=smooth((y-HORIZON)/560);
       for(let i=0;i<cols;i++){const k=j*cols+i,o=k*3;let r=base[o],g=base[o+1],b=base[o+2];const kd=kind[k];
-        if(kd===3){const gust=Math.exp(-((((i*cs+y*.35)-gpos)/110)**2)),amp=(cfg.wind()||1)*(.25+1.1*dep)*(.45+1.2*gust);
-          const off=amp*Math.sin(j*.35+ts*.9+i*.04),si=i+off,i0=Math.floor(si),f=si-i0;
+        if(kd===3){const gust=Math.exp(-((((px(i)+y*.35)-gpos)/110)**2)),amp=F*(cfg.wind()||1)*(.25+1.1*dep)*(.45+1.2*gust);
+          const off=amp*Math.sin(y*.058+ts*.9+i*.04/F),si=i+off,i0=Math.floor(si),f=si-i0;
           const ka=j*cols+clamp(i0,0,cols-1),kb=j*cols+clamp(i0+1,0,cols-1);
           if(!fam[ka]&&!fam[kb]){r=lerp(base[ka*3],base[kb*3],f);g=lerp(base[ka*3+1],base[kb*3+1],f);b=lerp(base[ka*3+2],base[kb*3+2],f)}
           const lift=gust*.05;r*=1+lift;g*=1+lift;b*=1+lift*.6;}
@@ -306,12 +333,15 @@ function engine(col,msk,cfg){
     // 2) Gags
     glow.fill(0);cfg.gags(S,ts,look);
     // 3) Endfarbe: Lichtwellen wie bei Lichtzeit + Licht der Tageszeit
-    const lk=look.lx+'|'+look.ly;if(lk!==lastL){lastL=lk;for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){const dx=(i*cs+cs/2-look.lx)/6,dy=(j*cs+cs/2-look.ly)/6*(j*cs>HORIZON?1.6:1);dist[j*cols+i]=Math.sqrt(dx*dx+dy*dy)}}
+    const lk=look.lx+'|'+look.ly;if(lk!==lastL){lastL=lk;for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){const cx=px(i+.5),cy=py(j+.5),dx=(cx-look.lx)/6,dy=(cy-look.ly)/6*(cy>HORIZON?1.6:1);dist[j*cols+i]=Math.sqrt(dx*dx+dy*dy)}}
     const ph=ts*1.4,amp=look.amp,tn=look.tint,na=look.night||0,fl=look.famLift||0;
     for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){const k=j*cols+i,o=k*3;let r=cr[o],g=cr[o+1],b=cr[o+2];
-      const lum=(0.3*r+0.59*g+0.11*b)/255;
-      const tf=fam[k]?fl:0;r*=lerp(tn[0],1,tf);g*=lerp(tn[1],1,tf);b*=lerp(tn[2],1,tf);
-      if(na>0){const bt=BAYER[(i&3)+((j&3)<<2)]/16;if(bt<na*(fam[k]?.22:.62)){const b2=BAYER[((i+2)&3)+(((j+1)&3)<<2)]/16,l2=(0.3*r+0.59*g+0.11*b)/255,lv=clamp(Math.floor(l2*4.4+b2*.9-.25+(fam[k]?.6:0)),0,4),p=PAL_N[lv];r=p[0];g=p[1];b=p[2]}}
+      const lum=(0.3*r+0.59*g+0.11*b)/255,isF=fam[k];
+      // Nacht wie Lichtzeit: erst entsättigen (die Familie weniger, sie steht im Mondlicht), dann die Nachttönung
+      if(na>0){const l=lum*255,ds=na*(isF?.4:.62);r=lerp(r,l,ds);g=lerp(g,l,ds);b=lerp(b,l,ds)}
+      const tf=isF?fl:0;r*=lerp(tn[0],1,tf);g*=lerp(tn[1],1,tf);b*=lerp(tn[2],1,tf);
+      // Dither nur in der Landschaft und nur in einem Viertel der Zellen, weich eingemischt; die Familie bleibt ohne Muster im Mondlicht, warme helle Lichter bleiben ausgenommen
+      if(na>0&&!isF){const bt=BAYER[(i&3)+((j&3)<<2)]/16;if(bt<na*.25&&!(r>b+50&&lum>.3)){const b2=BAYER[((i+2)&3)+(((j+1)&3)<<2)]/16,l2=(0.3*r+0.59*g+0.11*b)/255,lv=clamp(Math.floor(l2*4.4+b2*.9-.25),0,4),p=PAL_N[lv],m=.65*na;r=lerp(r,p[0],m);g=lerp(g,p[1],m);b=lerp(b,p[2],m)}}
       const w=.5+.5*Math.sin(ph-dist[k]/16),f=.9+amp*w*(.4+.6*Math.sqrt(lum));
       r*=f;g*=f;b*=f;const ga=glow[k*4+3];if(ga>0){r=lerp(r,glow[k*4],ga);g=lerp(g,glow[k*4+1],ga);b=lerp(b,glow[k*4+2],ga)}
       bu[k]=(255<<24)|(clamp(b,0,255)<<16)|(clamp(g,0,255)<<8)|clamp(r,0,255)}
@@ -321,18 +351,19 @@ function engine(col,msk,cfg){
 // Neutrales, leeres Raster: ohne gültigen Schlüssel gibt es kein Foto, nur das ruhige Raster
 function leer(){const r=rng(3),buf=cv(COLS,ROWS),bx=buf.getContext('2d'),im=bx.createImageData(COLS,ROWS),u=new Uint32Array(im.data.buffer);
   for(let j=0;j<ROWS;j++)for(let i=0;i<COLS;i++){const v=(r()-.5)*6,k=j*COLS+i,b=40+v+(j/ROWS)*8,g=38+v+(j/ROWS)*5,rr=34+v+(j/ROWS)*3;u[k]=(255<<24)|(clamp(b,0,255)<<16)|(clamp(g,0,255)<<8)|clamp(rr,0,255);}
-  bx.putImageData(im,0,0);
-  return t=>{ctx.imageSmoothingEnabled=false;ctx.drawImage(buf,0,0,canvas.width,canvas.height);ctx.fillStyle='rgb(18,19,24)';ctx.fill(grid);};}
+  bx.putImageData(im,0,0);const g=grid;
+  return t=>{ctx.imageSmoothingEnabled=false;ctx.drawImage(buf,0,0,canvas.width,canvas.height);ctx.fillStyle='rgb(18,19,24)';ctx.fill(g);};}
 
 // ---------- Uhr (S2: helle Pixelziffern mit weichem Schatten, Pixel verwehen und setzen sich neu) ----------
-function paint(S,i,j,c,a,n,cn,behind=false){if(a<=0)return;if(n<1)S.put(i,j,c,a*(1-n),behind);if(n>0)S.glow(i,j,cn||c,a*n,behind)}
+// Anzeigepunkte (Uhr, Temperatur, Symbole, Lichterkette) sind Z×Z Zellen groß und hängen an den Bildschirmecken, damit sie bei jedem Raster lesbar bleiben
+function paint(S,i,j,c,a,n,cn,behind=false){if(a<=0)return;if(n<1)S.blk(i,j,c,a*(1-n),behind);if(n>0)S.glowBlk(i,j,cn||c,a*n,behind)}
 const GLY={"0":["###","#.#","#.#","#.#","###"],"1":[".#.","##.",".#.",".#.","###"],"2":["###","..#","###","#..","###"],"3":["###","..#",".##","..#","###"],"4":["#.#","#.#","###","..#","..#"],"5":["###","#..","###","..#","###"],"6":["###","#..","###","#.#","###"],"7":["###","..#",".#.",".#.",".#."],"8":["###","#.#","###","#.#","###"],"9":["###","#.#","###","..#","###"],
   "°":[".#.","#.#",".#.","...","..."],"-":["...","...","###","...","..."]," ":["...","...","...","...","..."]};
 const gOn=(ch,x,y)=>{const g=GLY[ch]||GLY[" "];return y>=0&&y<5&&x>=0&&x<3&&g[y][x]==='#'};
 const BIG={"0":[".###.","#...#","#...#","#...#","#...#","#...#",".###."],"1":["..#..",".##..","..#..","..#..","..#..","..#..",".###."],"2":[".###.","#...#","....#","...#.","..#..",".#...","#####"],"3":[".###.","#...#","....#","..##.","....#","#...#",".###."],"4":["...#.","..##.",".#.#.","#..#.","#####","...#.","...#."],"5":["#####","#....","####.","....#","....#","#...#",".###."],"6":["..##.",".#...","#....","####.","#...#","#...#",".###."],"7":["#####","....#","...#.","..#..",".#...",".#...",".#..."],"8":[".###.","#...#","#...#",".###.","#...#","#...#",".###."],"9":[".###.","#...#","#...#",".####","....#","...#.",".##.."]," ":[".....",".....",".....",".....",".....",".....","....."]};
 const bOn=(ch,x,y)=>{const g=BIG[ch]||BIG[" "];return y>=0&&y<7&&x>=0&&x<5&&g[y][x]==='#'};
 function skyClock(C){const st=[0,1,2,3].map(()=>({from:' ',to:' ',t0:null}));let last='';const dur=1.1;
-  return (S,L,ts)=>{const n=clamp(L.night*1.2,0,1),tt=L.hhmm,tot=26,x0=S.cols-3-tot,y0=4;
+  return (S,L,ts)=>{const n=clamp(L.night*1.2,0,1),tt=L.hhmm,tot=26,x0=S.hc-3-tot,y0=4;
     if(tt!==last){for(let i=0;i<4;i++)if(tt[i]!==(last[i]||' ')){st[i].from=st[i].to;st[i].to=tt[i];st[i].t0=last?ts+i*.08:null}last=tt}
     const P=[],xs=[0,6,14,20];
     st.forEach((s,d)=>{const p=s.t0==null?1:clamp((ts-s.t0)/dur,0,1),bx=x0+xs[d];
@@ -371,13 +402,13 @@ const tempStr=wx=>{const tp=Math.round(wx.temp);return(tp<0?'-':'')+Math.abs(tp)
 // ---------- Countdown-Lichterkette im Himmel unter der Uhr: 15 Birnen, jede Minute geht eine aus ----------
 const BULB=[[255,96,84],[255,204,70],[120,224,120],[96,176,255],[255,150,220]];
 const BULB_ABEND=[[250,176,112],[240,206,150],[196,170,236],[160,192,236],[246,180,170]];
-function lichterkette(S,ts,cd,n){if(!cd)return;const p=cd.p,N=15,left=N-Math.floor(p*N),fr=(p*N)%1,ax=44,ay=22,bx=87,by=19,sag=7,fade=smooth(Math.min(1,(p*15*60)/2));
+function lichterkette(S,ts,cd,n){if(!cd)return;const p=cd.p,N=15,left=N-Math.floor(p*N),fr=(p*N)%1,ax=S.hc-46,ay=22,bx=S.hc-3,by=19,sag=7,fade=smooth(Math.min(1,(p*15*60)/2));
   for(let q=0;q<=60;q++){const t=q/60,x=lerp(ax,bx,t),y=lerp(ay,by,t)+sag*4*t*(1-t);paint(S,x,y,[52,56,62],.6*fade,n,[90,90,110],true)}
   const abend=cd.c.stil==='sanft',PAL=abend?BULB_ABEND:BULB,hell=abend?.92:1;
   for(let k=0;k<N;k++){const t=(k+.5)/N,x=Math.round(lerp(ax,bx,t)),y=Math.round(lerp(ay,by,t)+sag*4*t*(1-t))+1,lit=k<left,c=PAL[k%PAL.length];
     if(lit){const last=k===left-1,glimm=abend?.85+.15*Math.sin(ts*1.3+k):1,a=(last&&fr>.75?(abend?.55+.45*Math.sin(ts*2.2):(Math.floor(ts*4)%2?1:.35)):1)*fade*hell*glimm;
-      for(const[dx,dy]of[[-1,0],[2,0],[0,2],[1,2],[0,3],[1,3]])S.glow(x+dx,y+dy,c,.2*a,true);
-      for(const[dx,dy]of[[0,0],[1,0],[0,1],[1,1]])S.glow(x+dx,y+dy,c,.95*a,true)}
+      for(const[dx,dy]of[[-1,0],[2,0],[0,2],[1,2],[0,3],[1,3]])S.glowBlk(x+dx,y+dy,c,.2*a,true);
+      for(const[dx,dy]of[[0,0],[1,0],[0,1],[1,1]])S.glowBlk(x+dx,y+dy,c,.95*a,true)}
     else for(const[dx,dy]of[[0,0],[1,0],[0,1],[1,1]])paint(S,x+dx,y+dy,[96,100,108],.55*fade,n,[60,62,80],true)}}
 
 // ---------- Szenen-Ablauf: immer nur ein Gag, Uhr und Symbole bleiben frei ----------
@@ -400,103 +431,108 @@ function szeneText(ts){const e=EV.filter(e=>e.type!=='ducks').map(e=>SCN[e.type]
   let s='Szene: '+(e.length?e.join(', '):'keine');if(d)s+=' + Enten';if(SZENEN.an&&!e.length)s+=' (nächster Gag in '+Math.max(0,Math.round((nextGag-ts)/60))+' min)';return s}
 
 // ---------- Licht der Tageszeit nach echtem Sonnenstand ----------
+const NACHT=[.22,.25,.38],NACHT_DAEMMER=[.42,.43,.58];
 function lightAt(T,d){const s=sunPos(T),a=s.alt,morning=s.az<0,ST=sunTimes(d);
   const warm=morning?[1.12,.86,.72]:[1.14,.9,.74],dusk=morning?[1.08,.8,.74]:[1.0,.72,.7];
   let tint,night;
+  // Nacht: dunkles, wenig gesättigtes Blau wie bei Lichtzeit (die Entsättigung und der Dither folgen in der Engine)
   if(a>=10){tint=[1,1,1];night=0}
   else if(a>=0){const k=smooth(a/10);tint=mix(warm,[1,1,1],k);night=lerp(.2,0,smooth(a/5))}
-  else if(a>=-6){const k=smooth(-a/6);tint=mix(dusk,[.52,.52,.74],k);night=lerp(.2,.75,k)}
-  else if(a>=-12){const k=smooth((-a-6)/6);tint=mix([.52,.52,.74],[.42,.46,.7],k);night=lerp(.75,1,k)}
-  else{tint=[.42,.46,.7];night=1}
+  else if(a>=-6){const k=smooth(-a/6);tint=mix(dusk,NACHT_DAEMMER,k);night=lerp(.2,.75,k)}
+  else if(a>=-12){const k=smooth((-a-6)/6);tint=mix(NACHT_DAEMMER,NACHT,k);night=lerp(.75,1,k)}
+  else{tint=NACHT;night=1}
   let lx,ly;const sunUp=T>=ST.rise&&T<=ST.set;
   if(sunUp){const p=clamp((T-ST.rise)/(ST.set-ST.rise),0,1);lx=lerp(40,500,p);ly=lerp(330,40,Math.sin(p*Math.PI))}
   else{const a0=T<ST.rise?ST.prevSet:ST.set,b0=T<ST.rise?ST.rise:ST.nextRise,p=clamp((T-a0)/(b0-a0),0,1);lx=lerp(500,40,p);ly=60}
-  return{tint,night,lx,ly,amp:lerp(.2,.14,night),alt:a,sunUp,ST}}
+  return{tint,night,lx,ly,amp:lerp(.2,.1,night),alt:a,sunUp,ST}}
 
-// ---------- Das Bild ----------
+// ---------- Das Bild. Alle Positionen in Foto-Koordinaten (540×960), erst beim Zeichnen in Zellen umgerechnet ----------
 function build(col,msk){
   const r=rng(5);
   const flies=Array.from({length:28},(_,n)=>({x:lerp(10,530,r()),y:lerp(560,930,r()),ph:r()*6.28,f:lerp(.4,1,r()),ta:n/28*Math.PI*2,tr:lerp(.85,1.1,r())}));
   const stars=Array.from({length:80},()=>({x:lerp(5,535,r()),y:lerp(5,320,r()),ph:r()*6.28}));
-  const drops=Array.from({length:260},()=>({x:r()*100-5,o:r()*170,v:lerp(55,80,r())}));
-  const RDROPS=Array.from({length:200},()=>({x:r()*100-5,o:r()*170,v:lerp(60,85,r())}));
-  const buts=Array.from({length:7},(_,n)=>({c:BUTCOL[n%BUTCOL.length],ph:r()*6.28,f:lerp(.7,1.3,r()),ox:lerp(-14,14,r()),oy:lerp(-12,8,r())}));
+  const drops=Array.from({length:260},()=>({x:r()*1.1-.05,o:r()*170,v:lerp(55,80,r())}));
+  const RDROPS=Array.from({length:200},()=>({x:r()*1.1-.05,o:r()*170,v:lerp(60,85,r())}));
+  const buts=Array.from({length:7},(_,n)=>{const c=BUTCOL[n%BUTCOL.length];return{c,pal:{c,l:mix(c,[255,255,255],.35),B:[40,34,30]},ph:r()*6.28,f:lerp(.7,1.3,r()),ox:lerp(-14,14,r()),oy:lerp(-12,8,r())}});
   let bundle=null,sparkle=[];
   return engine(col,msk,{seed:31,wind:WX_wind,
-    init(S){const cs=S.cs;
-      bundle=S.region((x,y)=>x>=398&&x<=474&&y>=298&&y<=458&&!(y>=350&&y<=372),(i,j)=>{let ii=Math.round(482/cs);while(ii<S.cols-1&&S.fam[j*S.cols+ii])ii++;const o=(j*S.cols+ii)*3;return[S.base[o],S.base[o+1],S.base[o+2]]})},
+    init(S){
+      bundle=S.region((x,y)=>x>=398&&x<=474&&y>=298&&y<=458&&!(y>=350&&y<=372),(i,j)=>{let ii=Math.round(S.ci(482));while(ii<S.cols-1&&S.fam[j*S.cols+ii])ii++;const o=(j*S.cols+ii)*3;return[S.base[o],S.base[o+1],S.base[o+2]]})},
     look:(S,ts)=>{const T=curT(),d=wall(T),L=lightAt(T,d);schedule(ts,L,d);
       let {tint,night,lx,ly,amp}=L;
       const wx=wxNow();if(wx.rainNow){tint=mix(tint,[.76,.8,.88],.85);amp=.09}
       const rn=running('rain',ts);if(rn>=0){const k=env(rn,0,13,2,3);tint=mix(tint,[.7,.75,.84],k);amp=lerp(amp,.08,k)}
       // Gute Nacht: für die Dauer des Moments sanft abendlich, auch wenn die Sonne noch scheint
-      const gn=running('night',ts);if(gn>=0){const k=env(gn,0,32,4,6);tint=mix(tint,[.5,.52,.76],k*.85);night=Math.max(night,k*.55);amp=lerp(amp,.12,k);lx=lerp(lx,75,k);ly=lerp(ly,230,k)}
-      return{lx:Math.round(lx),ly:Math.round(ly),amp,tint,night,famLift:.35,alt:L.alt,sunUp:L.sunUp,d,T,ST:L.ST,
-        hhmm:String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0'),gridCol:night>.5?[14,16,30]:undefined}},
-    gags(S,ts,L){const cs=S.cs,n=L.night,day=L.sunUp,d=L.d,wx=wxNow();
+      const gn=running('night',ts);if(gn>=0){const k=env(gn,0,32,4,6);tint=mix(tint,NACHT_DAEMMER,k*.85);night=Math.max(night,k*.55);amp=lerp(amp,.1,k);lx=lerp(lx,75,k);ly=lerp(ly,230,k)}
+      return{lx:Math.round(lx),ly:Math.round(ly),amp,tint,night,famLift:lerp(.35,.42,night),alt:L.alt,sunUp:L.sunUp,d,T,ST:L.ST,
+        hhmm:String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0'),gridCol:night>.5?[8,9,16]:undefined}},
+    gags(S,ts,L){const n=L.night,day=L.sunUp,d=L.d,wx=wxNow(),{ci,cj,sz,F}=S,cols=S.cols,rows=S.rows;
       // ---- echter Regen draußen = Regen im Bild; hört er tagsüber auf: Regenbogen mit Einhorn ----
-      if(wx.rainNow)for(const q of RDROPS){const y=((ts*q.v+q.o)%175)-5,xx=q.x+y*.12+wx.wind*.004*y;S.glow(xx,y,[226,236,255],.55);S.glow(xx-.12,y-1,[226,236,255],.3)}
+      const regen=(Q,a1,a2,a3)=>{for(const q of Q){const y=(((ts*q.v+q.o)%175)-5)*rows/160,xx=q.x*cols+y*.12+(a3?wx.wind*.004*y:0);S.glow(xx,y,[226,236,255],a1);S.glow(xx-.12,y-1,[226,236,255],a2);if(a3===undefined)S.glow(xx-.24,y-2,[226,236,255],a1*.27)}};
+      if(wx.rainNow)regen(RDROPS,.55,.3,true);
       if(WX.wasRain===true&&!wx.rainNow&&day)start('rain',ts-12.5);WX.wasRain=wx.rainNow;
-      // ---- Nacht: Sterne + Glühwürmchen ----
+      // ---- Nacht: Sterne + Glühwürmchen, einzelne helle Punkte ----
       const gn=running('night',ts),gk=gn>=0?env(gn,9,28,3,4):0;
-      if(n>.2)for(const s of stars){const i=Math.round(s.x/cs),j=Math.round(s.y/cs);if(S.kind[j*S.cols+i]!==2)continue;const v=.5+.5*Math.sin(ts*1.7+s.ph);S.glow(i,j,[230,234,255],n*v*.75,true)}
+      if(n>.2)for(const s of stars){const i=Math.round(ci(s.x)),j=Math.round(cj(s.y));if(i<0||j<0||i>=cols||j>=rows||S.kind[j*cols+i]!==2)continue;const v=.5+.5*Math.sin(ts*1.7+s.ph);S.glow(i,j,[230,234,255],n*v*.8,true)}
       if(n>.3||gk>0){const cx=330,cy=600;for(const f of flies){let x0=f.x+18*Math.sin(ts*f.f*.6+f.ph),y0=f.y+12*Math.sin(ts*f.f*.8+f.ph*1.3);
         if(gk>0){const a=f.ta+ts*.25,tx=cx+Math.cos(a)*250*f.tr,ty=cy+Math.sin(a)*300*f.tr;x0=lerp(x0,tx,gk);y0=lerp(y0,ty,gk)}
-        const v=Math.max(0,Math.sin(ts*f.f*2.2+f.ph)),a=Math.max(n,gk)*(.35+.65*v);S.glow(x0/cs,y0/cs,[255,236,120],a,false);if(v>.6)S.glow(x0/cs+1,y0/cs,[255,226,110],a*.45)}}
-      // Sternschnuppen: unterhalb von Uhr, Symbolen und Lichterkette, damit nichts verdeckt wird
-      const shoot=(t0,x0,y0,x1,y1)=>{const p=(ts-t0)/1.4;if(p<0||p>1.25)return;for(let q=0;q<9;q++){const pp=p-q*.04;if(pp<0||pp>1)continue;S.glow(lerp(x0,x1,pp),lerp(y0,y1,pp),[255,250,230],(1-q/9)*(p>1?1-(p-1)*4:1),true)}};
-      if(gn>=0){const t0=EV.find(e=>e.type==='night').t0;shoot(t0+8,6,34,56,52);shoot(t0+19,86,36,44,56)}
-      else if(n>.6){if(ts>nextShoot+1.6)nextShoot=ts+lerp(12,25,Math.random());shoot(nextShoot,10+((nextShoot*7)%40),34,60+((nextShoot*3)%25),52)}
+        const v=Math.max(0,Math.sin(ts*f.f*2.2+f.ph)),a=Math.max(n,gk)*(.35+.65*v);S.glow(ci(x0),cj(y0),[255,236,120],a,false);if(v>.6)S.glow(ci(x0)+1,cj(y0),[255,226,110],a*.45)}}
+      // Sternschnuppen (Foto-Koordinaten): unterhalb von Uhr, Symbolen und Lichterkette, damit nichts verdeckt wird
+      const shoot=(t0,x0,y0,x1,y1)=>{const p=(ts-t0)/1.4;if(p<0||p>1.25)return;for(let q=0;q<9;q++){const pp=p-q*.04;if(pp<0||pp>1)continue;S.glow(ci(lerp(x0,x1,pp)),cj(lerp(y0,y1,pp)),[255,250,230],(1-q/9)*(p>1?1-(p-1)*4:1),true)}};
+      if(gn>=0){const t0=EV.find(e=>e.type==='night').t0;shoot(t0+8,36,204,336,312);shoot(t0+19,516,216,264,336)}
+      else if(n>.6){if(ts>nextShoot+1.6)nextShoot=ts+lerp(12,25,Math.random());shoot(nextShoot,60+((nextShoot*42)%240),204,360+((nextShoot*18)%150),312)}
       // ---- Gute Nacht: Mond geht links auf ----
-      if(gn>=0){const k=env(gn,0,32,1,5),rise=smooth(gn/9),mj=lerp(64,36,rise),mi=10;
-        for(let a=0;a<24;a++){const an=a/24*Math.PI*2;S.glow(mi+2+Math.cos(an)*4.2,mj+2+Math.sin(an)*4.2,[230,230,210],k*.18,true)}
-        S.glowSprite('moon',mi,mj,k*.95)}
+      if(gn>=0){const k=env(gn,0,32,1,5),rise=smooth(gn/9),mx=ci(60),my=cj(lerp(384,216,rise)),mc=sz(2.5);
+        for(let a=0;a<24;a++){const an=a/24*Math.PI*2;S.glow(mx+mc+Math.cos(an)*4.2*F,my+mc+Math.sin(an)*4.2*F,[230,230,210],k*.18,true)}
+        S.glowSprite('moon',mx,my,k*.95)}
       // ---- tagsüber: Silberreiher, zwei Schmetterlinge im Feld ----
       if(day){
-        const e=((ts+6)%26),A=[Math.round(40/cs),Math.round(600/cs)],B=[Math.round(470/cs),Math.round(470/cs)];
+        const e=((ts+6)%26),A=[ci(40),cj(600)],B=[ci(470),cj(470)],hop=27*F;
         if(e<9)S.sprite(e%3>2.2?'egretPeck':'egret',A[0],A[1]);
-        else if(e<13){const p=smooth((e-9)/4);S.sprite(Math.floor(e*5)%2?'egUp':'egDn',lerp(A[0],B[0],p),lerp(A[1],B[1],p)-Math.sin(p*Math.PI)*27+3)}
+        else if(e<13){const p=smooth((e-9)/4);S.sprite(Math.floor(e*5)%2?'egUp':'egDn',lerp(A[0],B[0],p),lerp(A[1],B[1],p)-Math.sin(p*Math.PI)*hop+3*F)}
         else if(e<22)S.sprite(e%3>2.2?'egretPeck':'egret',B[0],B[1],1,true);
-        else{const p=smooth((e-22)/4);S.sprite(Math.floor(e*5)%2?'egUp':'egDn',lerp(B[0],A[0],p),lerp(B[1],A[1],p)-Math.sin(p*Math.PI)*27+3,1,true)}
-        for(let q=0;q<2;q++){const b=buts[q],bx=(120+q*260+90*Math.sin(ts*.27*b.f+b.ph))/cs,by=(640+60*Math.sin(ts*.41*b.f+q))/cs+Math.sin(ts*9+q)*.6,op=Math.floor(ts*7+q*3)%2;
-          if(op){S.put(bx-1,by,b.c,1,true);S.put(bx+1,by,b.c,1,true)}else S.put(bx,by-1,b.c,1,true);S.put(bx,by,[40,34,30],1,true)}
+        else{const p=smooth((e-22)/4);S.sprite(Math.floor(e*5)%2?'egUp':'egDn',lerp(B[0],A[0],p),lerp(B[1],A[1],p)-Math.sin(p*Math.PI)*hop+3*F,1,true)}
+        for(let q=0;q<2;q++){const b=buts[q],bx=ci(120+q*260+90*Math.sin(ts*.27*b.f+b.ph)),by=cj(640+60*Math.sin(ts*.41*b.f+q))+Math.sin(ts*9+q)*.6*F,op=Math.floor(ts*7+q*3)%2;
+          S.sprite(op?'fbO':'fbC',bx-sz(1),by-sz(1),1,false,false,1,b.pal)}
       }
-      // ---- Laufenten mit trödelndem Küken (hinter uns) ----
-      const de=running('ducks',ts);if(de>=0){const lead=S.cols+2-de*4.2,row=Math.round(530/cs),step=Math.floor(de*3.2)%2;
-        [[0,'duck'],[6,'bduck'],[12,'duck'],[18,'duck']].forEach(([o,nm],q)=>S.sprite(nm+((step+q)%2?'A':'B'),lead+o,row-5));
-        const k=de%8,gap=k<6?2+k*1.1:2+8.6*(1-smooth((k-6)/2)),fast=k>=6;S.sprite('kid'+((Math.floor(de*(fast?8:3.2)))%2?'A':'B'),lead+22+gap,row-2)}
+      // ---- Laufenten mit trödelndem Küken (hinter uns), von rechts nach links am Wasserrand ----
+      const de=running('ducks',ts);if(de>=0){const lead=ci(W+12-de*25.2),row=Math.round(cj(530)),step=Math.floor(de*3.2)%2,dj=row-sz(6)+1;
+        [[0,'duck'],[6,'bduck'],[12,'duck'],[18,'duck']].forEach(([o,nm],q)=>S.sprite(nm+((step+q)%2?'A':'B'),lead+o*F,dj));
+        const k=de%8,gap=k<6?2+k*1.1:2+8.6*(1-smooth((k-6)/2)),fast=k>=6;S.sprite('kid'+((Math.floor(de*(fast?8:3.2)))%2?'A':'B'),lead+(22+gap)*F,row-sz(3)+1)}
       // ---- Hut lüften ----
-      const he=running('hat',ts);if(he>=0){if(he<2.4)S.hat(S.HV,Math.round(3*Math.sin(Math.PI*he/2.4)));if(he>=3.6&&he<6)S.hat(S.HM,Math.round(3*Math.sin(Math.PI*(he-3.6)/2.4)))}
+      const he=running('hat',ts);if(he>=0){const h=Math.round(3*F);if(he<2.4)S.hat(S.HV,Math.round(h*Math.sin(Math.PI*he/2.4)));if(he>=3.6&&he<6)S.hat(S.HM,Math.round(h*Math.sin(Math.PI*(he-3.6)/2.4)))}
       // ---- Affe klaut ein Reisbündel von Max' Stange und bringt es zurück ----
-      const me=running('monkey',ts);if(me>=0){const pr=Math.round(361/cs),j0=pr-8,xg=Math.round(474/cs),out=S.cols+8;let mx,bdx=0,bdy=0,face=-1,walk=true,hop=0;
-        if(me<3){mx=lerp(S.cols+1,xg,smooth(me/3))}
-        else if(me<4.4){mx=xg;walk=false;hop=(me>3.5&&me<3.9)?1:0}
-        else if(me<5.2){mx=xg;walk=false;bdy=Math.round(2*smooth((me-4.4)/.8))}
-        else if(me<8){mx=lerp(xg,out,smooth((me-5.2)/2.8));bdx=mx-xg;bdy=2;face=1}
+      const me=running('monkey',ts);if(me>=0){const j0=Math.round(cj(361))-sz(8),xg=Math.round(ci(474)),out=cols+sz(8),lift=Math.round(2*F);let mx,bdx=0,bdy=0,face=-1,walk=true,hop=0;
+        if(me<3){mx=lerp(cols+1,xg,smooth(me/3))}
+        else if(me<4.4){mx=xg;walk=false;hop=(me>3.5&&me<3.9)?Math.round(F):0}
+        else if(me<5.2){mx=xg;walk=false;bdy=Math.round(lift*smooth((me-4.4)/.8))}
+        else if(me<8){mx=lerp(xg,out,smooth((me-5.2)/2.8));bdx=mx-xg;bdy=lift;face=1}
         else if(me<13.5){mx=out;bdx=200;walk=false}
-        else if(me<17){mx=lerp(out,xg,smooth((me-13.5)/3.5));bdx=mx-xg;bdy=2}
-        else if(me<18){mx=xg;walk=false;bdy=Math.round(2*(1-smooth(me-17)))}
-        else{mx=lerp(xg,S.cols+2,smooth((me-18)/3));face=1}
+        else if(me<17){mx=lerp(out,xg,smooth((me-13.5)/3.5));bdx=mx-xg;bdy=lift}
+        else if(me<18){mx=xg;walk=false;bdy=Math.round(lift*(1-smooth(me-17)))}
+        else{mx=lerp(xg,cols+2,smooth((me-18)/3));face=1}
         if(bdx||bdy)S.hat(bundle,bdy,Math.round(bdx));
         const fr=walk&&Math.floor(me*6)%2?'monkB':'monkA',jj=j0-hop;
-        S.sprite(fr,mx,jj,1,false,true);const tx=face<0?mx+6:mx-1,sg=face<0?1:-1,wag=Math.round(Math.sin(me*5));S.put(tx,jj+6,COL.m,1);S.put(tx+sg,jj+5,COL.m,1);S.put(tx+sg,jj+4+wag,COL.m,1);S.put(tx+sg*2,jj+3+wag,COL.m,1)}
+        S.sprite(fr,mx,jj,1,false,true);const t0=face<0?6:-1,sg=face<0?1:-1,wag=Math.round(Math.sin(me*5));
+        S.fput(mx,jj,t0,6,COL.m);S.fput(mx,jj,t0+sg,5,COL.m);S.fput(mx,jj,t0+sg,4+wag,COL.m);S.fput(mx,jj,t0+sg*2,3+wag,COL.m)}
       // ---- Schmetterlinge besuchen Valerie, einer landet auf dem Hut, eine Blüte wächst ----
-      const be=running('butter',ts);if(be>=0){const hx=Math.round(HATV.ax/cs),hy=Math.round(HATV.ay/cs)-1;
+      const be=running('butter',ts);if(be>=0){const hx=Math.round(ci(HATV.ax)),hy=Math.round(cj(HATV.ay))-Math.round(F);
         buts.forEach((b,q)=>{let bx,by;const lead=q===0;
-          const come=smooth(be/4),leave=smooth((be-15)/5),orbit=[hx+b.ox+Math.sin(be*1.3*b.f+b.ph)*4,hy+b.oy+Math.cos(be*1.1*b.f+b.ph)*3];
-          const startP=[-6-q*3,40+q*6],endP=[S.cols+6,10+q*4];
+          const come=smooth(be/4),leave=smooth((be-15)/5),orbit=[hx+(b.ox+Math.sin(be*1.3*b.f+b.ph)*4)*F,hy+(b.oy+Math.cos(be*1.1*b.f+b.ph)*3)*F];
+          const startP=[(-6-q*3)*F,(40+q*6)*F],endP=[cols+6*F,(10+q*4)*F];
           let tgt=lead&&be>4&&be<15?[hx,hy]:orbit;bx=lerp(startP[0],tgt[0],come);by=lerp(startP[1],tgt[1],come);bx=lerp(bx,endP[0],leave);by=lerp(by,endP[1],leave);
-          const sit=lead&&be>4.5&&be<15,op=sit?(Math.floor(be*1.5)%2):(Math.floor(be*8+q)%2);by+=sit?0:Math.sin(be*9+q)*.6;
-          bx=Math.round(bx);by=Math.round(by);const W2=[[-2,-1],[-1,-1],[-2,0],[-1,0],[1,-1],[2,-1],[1,0],[2,0]],L2=[[-1,1],[1,1]];
-          if(op){for(const[a,c]of W2)S.put(bx+a,by+c,b.c,1);for(const[a,c]of L2)S.put(bx+a,by+c,mix(b.c,[255,255,255],.35),1)}else{S.put(bx-1,by-2,b.c,1);S.put(bx-1,by-1,b.c,1);S.put(bx+1,by-2,b.c,1);S.put(bx+1,by-1,b.c,1)}S.put(bx,by-1,[40,34,30],1);S.put(bx,by,[40,34,30],1);S.put(bx,by+1,[40,34,30],1)});
-        const fk=env(be,5,16,1.2,1.5);if(fk>0){const fx=Math.round((HATV.ax+44)/cs),fy=Math.round((HATV.brim-14)/cs),grow=Math.ceil(fk*5);const fl=SPR.flower;for(let rr=5-grow;rr<5;rr++)for(let c=0;c<3;c++){const ch=fl[rr][c];if(ch!=='.')for(let q=0;q<4;q++)S.put(fx+c*2+(q%2),fy-4+rr*2+(q>>1),COL[ch],fk)}}}
+          const sit=lead&&be>4.5&&be<15,op=sit?(Math.floor(be*1.5)%2):(Math.floor(be*8+q)%2);by+=sit?0:Math.sin(be*9+q)*.6*F;
+          S.sprite(op?'butO':'butC',bx-sz(2),by-sz(2),1,false,true,1,b.pal)});
+        const fk=env(be,5,16,1.2,1.5);if(fk>0){const fx=Math.round(ci(HATV.ax+44)),fy=Math.round(cj(HATV.brim-14))-sz(2,2),grow=Math.ceil(fk*5);
+          S.sprite(SPR.flower.map((row,k)=>k<5-grow?'...':row),fx,fy,fk,false,true,2)}}
       // ---- Regen, Regenbogen, Einhorn mit Glitzerspur ----
       const re=running('rain',ts);if(re>=0){const ri=env(re,0,13,2,3);
-        if(ri>0)for(const q of drops){const y=((ts*q.v+q.o)%175)-5,xx=q.x+y*.12;S.glow(xx,y,[226,236,255],.75*ri);S.glow(xx-.12,y-1,[226,236,255],.45*ri);S.glow(xx-.24,y-2,[226,236,255],.2*ri)}
-        const bk=env(re,11,39,3,4);if(bk>0){const cx=S.cols/2,cy=112;for(let i=0;i<S.cols;i++){for(let b=0;b<7;b++){const R=68-b,dx=i-cx;if(Math.abs(dx)>=R)continue;const y=cy-Math.sqrt(R*R-dx*dx),y2=cy-Math.sqrt(R*R-Math.min(R*R-1,(dx+1)*(dx+1)));for(let yy=Math.round(Math.min(y,y2));yy<=Math.round(Math.max(y,y2));yy++)S.put(i,yy,RAINBOW[b],.5*bk,true)}}
-          const ue=re-17;if(ue>=0&&ue<10){const ux=lerp(-16,S.cols+2,ue/10),dx=ux+3-cx,uy=cy-Math.sqrt(Math.max(0,70*70-dx*dx))-6+(Math.floor(ue*5)%2?0:-1);
-            S.sprite(Math.floor(ue*5)%2?'uniA':'uniB',ux,uy-6,1,false,true,2);sparkle.push({x:ux+1,y:uy+2,t:ts,c:RAINBOW[Math.floor(ue*14)%7]})}
-          sparkle=sparkle.filter(s=>ts-s.t<1.2);for(const s of sparkle)S.glow(s.x+Math.sin(s.t*40)*.8,s.y+(ts-s.t)*2,s.c,(1-(ts-s.t)/1.2)*.9)}}
+        if(ri>0)regen(drops,.75*ri,.45*ri);
+        const bk=env(re,11,39,3,4);if(bk>0){const cx=cols/2,cy=cj(672),R0=408*S.s,bw=Math.max(1,Math.round(F)),jTop=Math.max(0,Math.floor(cy-R0-1));
+          for(let j=jTop;j<Math.min(rows,Math.ceil(cy));j++)for(let i=0;i<cols;i++){const dd=Math.hypot(i+.5-cx,j+.5-cy),b=Math.floor((R0-dd)/bw);if(b>=0&&b<7)S.put(i,j,RAINBOW[b],.5*bk,true)}
+          const ue=re-17;if(ue>=0&&ue<10){const ux=lerp(-sz(16),cols+2,ue/10),dx=ux+sz(3)-cx,uy=cy-Math.sqrt(Math.max(0,(R0+2*F)**2-dx*dx))-sz(6)+(Math.floor(ue*5)%2?0:-1);
+            S.sprite(Math.floor(ue*5)%2?'uniA':'uniB',ux,uy-sz(6),1,false,true,2);sparkle.push({x:ux+F,y:uy+2*F,t:ts,c:RAINBOW[Math.floor(ue*14)%7]})}
+          sparkle=sparkle.filter(s=>ts-s.t<1.2);for(const s of sparkle)S.glow(s.x+Math.sin(s.t*40)*.8,s.y+(ts-s.t)*2*F,s.c,(1-(ts-s.t)/1.2)*.9)}}
       // ---- zuletzt: Uhr, Temperatur, Symbole, Lichterkette (immer obenauf) ----
       const nn=clamp(n*1.2,0,1);clock(S,L,ts);
       const tsr=tempStr(wx);text(S,tsr,3,6,nn);miniRow(S,needs(L,wx,d),3+tsr.length*4+1,10,nn,ts);
@@ -523,6 +559,13 @@ let wake=null;
 function keepAwake(){try{if(!wake&&navigator.wakeLock&&document.visibilityState==='visible')navigator.wakeLock.request('screen').then(w=>{wake=w;w.addEventListener('release',()=>{wake=null;});}).catch(()=>{});}catch(e){}}
 document.addEventListener('visibilitychange',keepAwake);addEventListener('pointerdown',keepAwake);setInterval(keepAwake,6e4);
 if(DEV)canvas.addEventListener('click',()=>document.body.classList.toggle('clean'));else addEventListener('contextmenu',e=>e.preventDefault());
+// Ohne ?dev=1: 3 Sekunden ruhig aufs Bild drücken blendet die Test-Leiste ein, nochmal 3 Sekunden blendet sie aus. Alle anderen Berührungen bleiben ohne Wirkung.
+let devOn=DEV,pressT=0,pressX=0,pressY=0;
+function setDev(on){devOn=on;document.body.classList.toggle('dev',on);document.body.classList.remove('clean');if(on&&started){initDev();setBtns();}}
+if(!DEV){const stop=()=>{if(pressT){clearTimeout(pressT);pressT=0;}};
+  canvas.addEventListener('pointerdown',e=>{stop();pressX=e.clientX;pressY=e.clientY;pressT=setTimeout(()=>{pressT=0;setDev(!devOn);},3000);});
+  canvas.addEventListener('pointermove',e=>{if(pressT&&Math.hypot(e.clientX-pressX,e.clientY-pressY)>24)stop();});
+  for(const ev of['pointerup','pointercancel','pointerleave'])canvas.addEventListener(ev,stop);addEventListener('blur',stop);}
 const RELOAD={at:(()=>{const n=wall(nowT());let r=fromWall(n.getFullYear(),n.getMonth(),n.getDate(),4);if(r<=nowT())r=fromWall(n.getFullYear(),n.getMonth(),n.getDate()+1,4);return r;})()};
 // location.reload() lädt dieselbe Adresse inklusive #k=… neu; geprüft wird vorher nur, ob die Seite erreichbar ist (sonst in 10 Minuten wieder)
 function neuLaden(){RELOAD.at=nowT()+10*6e4;return fetch(location.pathname,{method:'HEAD',cache:'no-store'}).then(r=>{if(r.ok)location.reload();}).catch(()=>{});}
@@ -546,10 +589,10 @@ function frame(now){requestAnimationFrame(frame);
   const dt=Math.min(0.1,(now-(frame.last||now))/1000);frame.last=now;if(playing)playT+=dt*1000*SPEED;
   const iv=1000/ANZ.max_fps;if(now-lastDraw<iv-4)return;lastDraw=now-lastDraw<2*iv?lastDraw+iv:now;
   const w0=performance.now();if(draw)draw(now);const work=performance.now()-w0;
-  if(!DEV)return;
-  fpsN++;fpsW+=work;if(now-fpsT>=1000){if(fpsT)$('fps').textContent=Math.round(fpsN*1000/(now-fpsT))+' Bilder/s (max. '+ANZ.max_fps+(ANZ_SRC.max_fps?', '+ANZ_SRC.max_fps:'')+') · '+(fpsW/fpsN).toFixed(1)+' ms\nRaster '+CP+' px je Zelle'+(ANZ_SRC.raster_px?' ('+ANZ_SRC.raster_px+')':' (auto)')+', Fuge '+GP+' px · '+canvas.width+'×'+canvas.height+' · Gerät '+innerWidth+'×'+innerHeight+' bei Pixeldichte '+(+(window.devicePixelRatio||1).toFixed(2));fpsN=0;fpsW=0;fpsT=now;}
+  if(!devOn)return;
+  fpsN++;fpsW+=work;if(now-fpsT>=1000){if(fpsT)$('fps').textContent=Math.round(fpsN*1000/(now-fpsT))+' Bilder/s (max. '+ANZ.max_fps+(ANZ_SRC.max_fps?', '+ANZ_SRC.max_fps:'')+') · '+(fpsW/fpsN).toFixed(1)+' ms\nRaster '+CP+' px je Zelle'+(ANZ_SRC.raster_px?' ('+ANZ_SRC.raster_px+')':' (auto)')+', Fuge '+GP+' px · '+COLS+'×'+ROWS+' Zellen · Figuren ×'+(+ZF.toFixed(2))+', Anzeige ×'+Z+'\nGerät '+innerWidth+'×'+innerHeight+' bei Pixeldichte '+(+(window.devicePixelRatio||1).toFixed(2));fpsN=0;fpsW=0;fpsT=now;}
   const T=curT(),d=wall(T);readout({d,alt:sunPos(T).alt,sunUp:(()=>{const s=sunTimes(d);return T>=s.rise&&T<=s.set})(),ST:sunTimes(d)},now/1000);}
-if(DEV){
+function initDev(){if(initDev.done)return;initDev.done=true;
   $('now').onclick=()=>{playing=false;T_SIM=null;setBtns();};
   $('play').onclick=()=>{if(playing){simAt(playT);}else{playT=curT();playing=true;}setBtns();};
   const today=(h,m,s)=>{const n=wall(curT());return fromWall(n.getFullYear(),n.getMonth(),n.getDate(),h,m,s);};
@@ -564,13 +607,13 @@ if(DEV){
     const T=curT(),L=lightAt(T,wall(T));if(!L.sunUp&&nm!=='ducks'){simAt(today(12,0,0));setBtns();}
     for(let i=EV.length-1;i>=0;i--)if(EV[i].type!=='ducks'&&nm!=='ducks')EV.splice(i,1);start(nm,ts);if(nm!=='ducks')nextGag=ts+SCN[nm].dur+lerp(SZENEN.min,SZENEN.max,Math.random())*60;});
 }
-window.__wd={get EV(){return EV},start,RELOAD,neuLaden,curT,sunTimes,tonneJetzt,countdownJetzt,get status(){return STATUS},get draw(){return draw}};
+window.__wd={get EV(){return EV},start,RELOAD,neuLaden,curT,sunTimes,tonneJetzt,countdownJetzt,setDev,get status(){return STATUS},get draw(){return draw},get raster(){return{CP,GP,COLS,ROWS,Z,ZF}}};
 
 // ---------- Start: Einstellungen, dann Wetter (gespeicherter Stand sofort) und Entschlüsseln parallel ----------
 function startBild(res){if(started)return;started=true;urlAnzeige();fit();
-  if(res&&res.bilder){const [img,maskImg]=res.bilder;const col=pixels(img,W,H),msk=pixels(maskImg,180,320);draw=build(col,msk);STATUS='Foto entschlüsselt';}
+  if(res&&res.bilder){const [img,maskImg]=res.bilder;BILD={col:pixels(img,W*SS,H*SS),msk:pixels(maskImg,W,H)};draw=build(BILD.col,BILD.msk);STATUS='Foto entschlüsselt';}
   else{draw=leer();STATUS='Kein gültiger Schlüssel: '+(res&&res.fehler?res.fehler:'Foto bleibt verborgen')+'. Es bleibt beim leeren Raster.';console.warn(STATUS);}
-  if(DEV)setBtns();keepAwake();requestAnimationFrame(frame);}
+  if(devOn){initDev();setBtns();}keepAwake();requestAnimationFrame(frame);}
 function boot(){if(WX.mode==='echt'){wxLoad();wxFetch();}
   return entschluesseln().then(bilder=>({bilder}),e=>({fehler:e.message}));}
 setTimeout(()=>startBild(null),12000); // Sicherheitsnetz: das Bild startet auf jeden Fall

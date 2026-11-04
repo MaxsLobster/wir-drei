@@ -17,8 +17,10 @@ Lichtzeit-Raster, das zugleich **Uhr**, **Wetteranzeige** und kleiner
 - **Licht:** Die Tageszeit färbt das Bild wie bei Lichtzeit, aber nach dem
   **echten Sonnenstand** für den Ort: Sonnenauf- und -untergang werden
   berechnet. Die Lichtquelle wandert mit der Sonne von links nach rechts, nachts
-  wandert sie zurück. Unter dem Horizont wird das Bild blau, ab der Dämmerung
-  kommt der Lichtzeit-Dither. Die Familie bleibt dabei immer erkennbar.
+  wandert sie zurück. Nachts wird das Bild dunkel, entsättigt und in ein
+  tiefes, ruhiges Blau getaucht wie bei Lichtzeit; der Dither liegt nur leicht
+  über der Landschaft. Die Familie bleibt ohne Muster wie im Mondlicht
+  erkennbar, Sterne, Glühwürmchen und Lichter sind einzelne helle Punkte.
 - **Uhr** oben rechts: helle Pixelziffern mit weichem Schatten, ohne Rahmen.
   Beim Minutenwechsel verwehen die alten Pixel und die neuen setzen sich.
 - **Oben links:** Temperatur und kleine Symbole in einer Reihe:
@@ -144,17 +146,28 @@ Regeln, damit nichts schiefgeht:
 
 ## Anzeige und Leistung
 
-Das Raster hat immer 90 × 160 Zellen wie der Prototyp; die Szenen sind darauf
-abgestimmt. Die Zellengröße passt sich dem Bildschirm an: Auf dem Muse (2160 ×
-3840 hochkant) hat eine Zelle 24 Bildpunkte, die Fuge 2. Auf einem
-1080 × 1920-Bildschirm sind es 12 und 1. Hat der Bildschirm nicht das
-Seitenverhältnis 9:16, bleibt rundherum ein dunkler Rand.
+Das Raster passt sich wie bei Lichtzeit automatisch an den Bildschirm an und
+füllt ihn randlos: Die Zellengröße ist die kurze Bildschirmseite geteilt durch
+108, gerundet. Auf dem Muse Frame (1080 × 1800 für die Seite, Chrome-Leiste
+oben) ergibt das 10 Bildpunkte je Zelle und 108 × 180 Zellen; auf 4K mit
+doppelter Pixeldichte 20 Bildpunkte und ebenfalls 108 × 180. Das Foto wird
+„cover“ skaliert: Die Breite füllt das Raster, oben und unten fallen wenige
+Prozent weg.
+
+Alle Positionen im Bild (Hüte, Reisbündel, Stange, Enten-Weg, Reiher, Affe,
+Schmetterlinge, Regenbogen, Mond, Sternschnuppen) sind in Foto-Koordinaten
+festgelegt und stimmen deshalb bei jeder Rastergröße. Die Pixelfiguren (Affe,
+Enten, Schmetterlinge, Einhorn, Reiher, Mond) werden mit dem Raster mitskaliert,
+sodass sie im Verhältnis zum Bild mindestens so groß bleiben wie bei 90
+Spalten. Uhr, Temperatur, Symbole und Lichterkette hängen an den Ecken und
+werden ab 150 Spalten ganzzahlig vergrößert, damit sie lesbar bleiben.
 
 Pro Gerät lässt sich die Anzeige an der Adresse überschreiben, ohne
-`config.json` zu ändern: `?raster=24&fps=30` (Zellengröße in Bildpunkten oder
-`auto`, höchste Bildrate).
+`config.json` zu ändern: `?raster=10&fps=30` (Zellengröße in Bildpunkten oder
+`auto`, höchste Bildrate). Ein fester Wert ändert nur die Zellengröße; Spalten
+und Zeilen ergeben sich weiter aus der Bildschirmfläche.
 
-Die Rechenarbeit ist klein (14 400 Zellen je Bild). Im Test-Modus steht oben
+Die Rechenarbeit ist klein (auf dem Muse 19 440 Zellen je Bild). Im Test-Modus steht oben
 links, wie viele Bilder pro Sekunde gezeichnet werden und wie lange ein Bild
 braucht.
 
@@ -168,7 +181,9 @@ der Info-Zeile.
 ## Ausstellungsmodus
 
 Die normale Adresse zeigt nur das Bild: keine Steuerleiste, kein Mauszeiger.
-Berührungen bewirken nichts. Außerdem:
+Berührungen bewirken nichts; nur ein langes, ruhiges Drücken aufs Bild
+(3 Sekunden) blendet die Test-Leiste ein, nochmal 3 Sekunden blendet sie wieder
+aus. Außerdem:
 
 - Der Bildschirm wird wach gehalten, wenn der Browser das unterstützt.
 - Jeden Tag um 4:00 lädt sich die Seite neu, damit Änderungen ankommen. Die
@@ -195,7 +210,7 @@ Der Schlüssel `#k=…` kommt immer ganz ans Ende.
 
 | Parameter | Wirkung |
 |---|---|
-| `?dev=1` | Test-Modus: Steuerleiste (Jetzt, Zeitraffer, 8:00 Kindergarten, 19:00 Schlafen, 14:00, 23:00, Wetter-Vorschau Regen/Kalt/Sonne, Tonnen-Vorschau, Szenen-Knöpfe), Info-Zeile mit Sonnenzeiten, Wetterquelle, aktueller Szene, Tonnen und Hinweisen. Ein Tipp aufs Bild blendet die Steuerung aus. |
+| `?dev=1` | Test-Modus: Steuerleiste (Jetzt, Zeitraffer, 8:00 Kindergarten, 19:00 Schlafen, 14:00, 23:00, Wetter-Vorschau Regen/Kalt/Sonne, Tonnen-Vorschau, Szenen-Knöpfe), Info-Zeile mit Sonnenzeiten, Wetterquelle, aktueller Szene, Tonnen und Hinweisen. Ein Tipp aufs Bild blendet die Steuerung aus. Ohne `?dev=1` blendet ein langes Drücken aufs Bild (3 Sekunden, ruhig halten) dieselbe Leiste ein, nochmal 3 Sekunden blendet sie aus; alle anderen Berührungen bleiben ohne Wirkung. |
 | `?t=2026-12-24T17:30` | Zeit simulieren. Die Uhr läuft ab diesem Moment weiter. Auch möglich: `?t=17:30` (heute) oder `?t=2026-12-24` (12 Uhr). |
 | `?wetter=regen` | Wetter erzwingen: `regen`, `kalt` oder `sonne`. |
 | `?raster=`, `?fps=` | Anzeige für dieses Gerät, siehe „Anzeige und Leistung“. |
