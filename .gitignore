@@ -1,0 +1,11 @@
+# Foto und Maske bleiben lokal. Ins Repo kommt nur das verschlüsselte Paket familie.enc.
+foto.jpg
+maske.png
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.key
+schluessel*
+.DS_Store
+.claude/

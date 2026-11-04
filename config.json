@@ -1,0 +1,25 @@
+{
+  "_notiz": "Einstellungen für Wir drei. Anleitung im README. Einträge mit _ am Anfang sind Notizen.",
+  "ort": { "name": "Chiemsee", "breite": 47.87, "laenge": 12.43 },
+
+  "countdowns": [
+    { "name": "Kindergarten", "von": "08:00", "bis": "08:15", "tage": ["Mo", "Di", "Mi", "Do", "Fr"], "stil": "bunt" },
+    { "name": "Schlafen", "von": "19:00", "bis": "19:15", "tage": ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"], "stil": "sanft" }
+  ],
+  "gute_nacht": "19:00",
+
+  "tonnen": [
+    { "name": "Papier", "farbe": "blau", "erster_termin": "2026-11-05", "alle_tage": 28, "verschiebungen": [] },
+    { "name": "Hausmüll", "farbe": "grau", "erster_termin": "2026-11-11", "alle_tage": 14, "verschiebungen": [] }
+  ],
+  "_tonnen_notiz": "Verschiebung durch Feiertage: {\"von\": \"2026-12-25\", \"auf\": \"2026-12-27\"} in die Liste verschiebungen der Tonne eintragen.",
+  "tonnen_anzeige": { "ab_vortag": "06:00", "bis_abholtag": "10:00" },
+
+  "schwellen": { "kalt_unter_grad": 5, "uv_ab": 5, "regen_ab_prozent": 50, "regen_stunden": 6 },
+
+  "szenen": { "an": true, "gag_alle_minuten": [10, 15], "enten_alle_minuten": 6 },
+
+  "wetter": { "echt": true, "aktualisieren_minuten": 15 },
+
+  "anzeige": { "raster_px": "auto", "max_fps": 30 }
+}
