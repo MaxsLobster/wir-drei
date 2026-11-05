@@ -21,5 +21,7 @@
 
   "wetter": { "echt": true, "aktualisieren_minuten": 15 },
 
+  "bewegung": { "an": true, "kleine_bewegungen_alle_sekunden": [20, 40], "schimmer": true },
+
   "anzeige": { "raster_px": "auto", "max_fps": 30 }
 }

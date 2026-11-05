@@ -1,7 +1,8 @@
 # Wir drei
 
-Ein lebendes Pixelbild: unser Familienfoto aus den Reisterrassen von Bali als
-Lichtzeit-Raster, das zugleich **Uhr**, **Wetteranzeige** und kleiner
+Ein lebendes Pixelbild: unser Familienfoto aus den Reisterrassen von Bali vor
+einer gemalten Landschaft („Vulkansee“: Terrassen steigen bis zu einem See,
+dahinter ein Vulkan, oben ein Streifen Himmel) als Lichtzeit-Raster, das zugleich **Uhr**, **Wetteranzeige** und kleiner
 **Tagesbegleiter** ist. Es läuft dauerhaft im Browser, gedacht für einen
 32-Zoll Muse Frame im Hochformat. Technik und Ruhe wie bei
 [Lichtzeit](https://github.com/MaxsLobster/lichtzeit).
@@ -12,16 +13,33 @@ Lichtzeit-Raster, das zugleich **Uhr**, **Wetteranzeige** und kleiner
 ## Was im Bild passiert
 
 - **Look:** Lichtzeit-Raster mit dünnen Fugen, Lichtwellen von der Sonne, Wind
-  in Feldern und Gras, ziehende Wolken, Glitzern im Wasser. Alles in der
-  Landschaft läuft hinter der Familie.
+  in Terrassen, Gras und auf dem See, ziehende Wolken nur im Himmelsstreifen
+  über dem Vulkan, Glitzern im Wasser. Alles in der Landschaft läuft hinter der
+  Familie.
+- **Lichtstrahl auf dem See** wie bei Lichtzeit: tagsüber unter der Sonne, warm
+  bei tiefem Stand, hell am Mittag, und er wandert mit dem echten Sonnenstand
+  von links (Osten) nach rechts (Westen). Nachts liegt er unter dem Mond, wenn
+  der Mond am Himmel steht. Steht er unter dem Horizont, wandert wie bei
+  Lichtzeit ein schwächerer Mondlichtstrahl mit der Nacht. Die Stärke folgt der
+  Mondphase. Der Strahl glitzert, wird zum nahen Ufer hin breiter und bleibt
+  innerhalb der Seefläche. Regen dämpft ihn.
+- **Wir bewegen uns mit:** Der echte Wind weht durch Annas Haare und das Gras im
+  Korb, beide Reisbündel pendeln, Valeries Kleid und Hose bewegen sich. Die
+  Gesichter bleiben immer ruhig. Alle 20–40 Sekunden kommt im Wechsel eine
+  kleine Bewegung: Valerie hüpft, Anna rückt den Korb zurecht (darunter
+  erscheint ihr Kopf), Max wippt die Stange und die Bündel schaukeln nach. Ein
+  leichter Schimmer liegt in Kleidung und Haaren (abschaltbar). Stellen, die
+  beim Bewegen kurz frei werden, füllt das leere Hintergrundbild.
 - **Licht:** Die Tageszeit färbt das Bild wie bei Lichtzeit, aber nach dem
   **echten Sonnenstand** für den Ort: Sonnenauf- und -untergang werden
-  berechnet. Die Lichtquelle wandert mit der Sonne von links nach rechts, nachts
-  wandert sie zurück. Nachts wird das Bild dunkel, entsättigt und in ein
+  berechnet. Die Lichtwellen gehen von der Sonne aus, nachts vom Mondstrahl auf
+  dem See. Nachts wird das Bild dunkel, entsättigt und in ein
   tiefes, ruhiges Blau getaucht wie bei Lichtzeit; der Dither liegt nur leicht
   über der Landschaft. Die Familie bleibt ohne Muster wie im Mondlicht
   erkennbar, Sterne, Glühwürmchen und Lichter sind einzelne helle Punkte.
-- **Uhr** oben rechts: helle Pixelziffern mit weichem Schatten, ohne Rahmen.
+- **Uhr** oben rechts: helle Pixelziffern mit dunklem Rand und Schatten, ohne
+  Rahmen, damit sie über Vulkan, Wolken und See lesbar bleiben. Temperatur und
+  Symbole haben denselben Rand.
   Beim Minutenwechsel verwehen die alten Pixel und die neuen setzen sich.
 - **Oben links:** Temperatur und kleine Symbole in einer Reihe:
   - Gummistiefel: es regnet gerade oder die Regenwahrscheinlichkeit in den
@@ -30,7 +48,8 @@ Lichtzeit-Raster, das zugleich **Uhr**, **Wetteranzeige** und kleiner
   - Sonnenhut und Sonnencreme: UV-Index 5 oder mehr, nur tagsüber
   - Mülltonne in der Tonnenfarbe (siehe „Mülltonnen“)
 - **Echtes Wetter** von [Open-Meteo](https://open-meteo.com), alle 15 Minuten.
-  Regnet es draußen, regnet es im Bild. Wind bewegt die Felder stärker. Hört
+  Regnet es draußen, regnet es im Bild. Wind bewegt Terrassen, See und uns
+  stärker. Hört
   der Regen tagsüber auf, erscheint ein Regenbogen hinter uns und ein Einhorn
   galoppiert mit Glitzerspur darüber. Der letzte Stand wird im Browser
   gespeichert; ohne Internet läuft das Bild damit weiter. Ist er älter als
@@ -39,7 +58,7 @@ Lichtzeit-Raster, das zugleich **Uhr**, **Wetteranzeige** und kleiner
   geht eine aus, die letzte blinkt kurz vor dem Ende.
   - Mo–Fr 8:00–8:15 (Kindergarten): knallbunt
   - täglich 19:00–19:15 (Schlafen): sanfte, müde Pastellfarben, langsames Glimmen
-- **Gute-Nacht-Moment um 19:00:** Der Mond geht auf, zwei Sternschnuppen fallen,
+- **Gute-Nacht-Moment um 19:00:** Der Mond steigt links hinter dem Vulkanhang auf, zwei Sternschnuppen fallen,
   Glühwürmchen kreisen um uns. Das Bild wird für die Dauer des Moments sanft
   abendlich, auch im Sommer, wenn die Sonne noch scheint. Danach gilt wieder
   das Licht nach Sonnenstand.
@@ -49,7 +68,11 @@ Lichtzeit-Raster, das zugleich **Uhr**, **Wetteranzeige** und kleiner
   - immer tagsüber: ein Silberreiher pickt und fliegt um, Schmetterlinge im
     Feld; regelmäßig ziehen balinesische Laufenten mit einem trödelnden Küken
     vorbei
-  - im Wechsel alle 10–15 Minuten tagsüber: ein Affe klaut ein Reisbündel von
+  - im Wechsel alle 10–15 Minuten tagsüber: **Pauli jagt die Enten** (unsere
+    braune Boxerhündin kommt hinten rechts, die Enten flattern mit
+    Ausrufezeichen in alle Richtungen bis in den Vordergrund, das Küken rennt
+    im Kreis, Pauli setzt sich hechelnd vor uns, dann rennen alle raus;
+    Figuren werden nach vorne größer, was vorne läuft, ist vor uns); ein Affe klaut ein Reisbündel von
     Max' Stange und bringt es zurück; Schmetterlinge besuchen Valerie, einer
     landet auf ihrem Hut und eine Blüte wächst; Valerie und Max lüften die Hüte
   - nachts: Sterne, Glühwürmchen, ab und zu eine Sternschnuppe
@@ -58,44 +81,49 @@ Lichtzeit-Raster, das zugleich **Uhr**, **Wetteranzeige** und kleiner
 
 ## Privatsphäre
 
-Das Foto zeigt unsere Tochter. Foto und Maske liegen deshalb **nicht im
+Das Foto zeigt unsere Tochter. Foto und Masken liegen deshalb **nicht im
 Klartext** im Repo:
 
-- Ins Repo kommt nur `familie.enc`: Foto und Maske zusammen, verschlüsselt mit
+- Ins Repo kommt nur `familie.enc`: Foto, Gesamtmaske, die drei Personen-Masken,
+  die See-Maske und das leere Hintergrundbild zusammen, verschlüsselt mit
   AES-256-GCM.
 - Der Schlüssel steht nur in der Adresse hinter `#k=…`. Dieser Teil einer
   Adresse (das „Fragment“) wird vom Browser **nie an den Server geschickt**,
   auch nicht an GitHub. Die Seite entschlüsselt das Paket im Browser und hält
-  Foto und Maske nur im Arbeitsspeicher.
+  die Bilder nur im Arbeitsspeicher.
 - Ohne gültigen Schlüssel zeigt die Seite nur ein neutrales, leeres Raster.
-- `foto.jpg` und `maske.png` stehen in `.gitignore` und können nicht aus
-  Versehen committet werden.
+- Alle Bilddateien (`*.jpg`, `*.png`) und die Vorlagen (`vorlage*.html`)
+  stehen in `.gitignore` und können nicht aus Versehen committet werden.
 - Das tägliche Neuladen um 4:00 behält die Adresse samt Schlüssel.
 
-### Neu verschlüsseln (bei neuem Foto oder neuer Maske)
+### Neu verschlüsseln (bei neuem Foto oder neuen Masken)
 
-Lokal auf dem Mac, Node muss installiert sein. Im Repo-Ordner:
-
-```bash
-node werkzeuge/verschluesseln.js ../foto.jpg ../maske.png
-```
-
-Das Werkzeug schreibt `familie.enc`, lost einen neuen Schlüssel aus und gibt ihn
-**einmal** im Terminal aus, zusammen mit der fertigen Adresse. Er wird nirgends
-gespeichert. Soll die Adresse im Muse gleich bleiben, den vorhandenen Schlüssel
-mitgeben:
+Lokal auf dem Mac, Node muss installiert sein. Die Bilder liegen im Ordner über
+dem Repo (`balifoto/`): `foto-g3.jpg`, `maske-g3.png`, `maske-anna.png`,
+`maske-max.png`, `maske-valerie.png`, `see-maske.png`,
+`hintergrund-leer-g3.jpg`. Das Werkzeug findet sie dort von selbst. Damit die
+Adresse im Muse gleich bleibt, immer den vorhandenen Schlüssel mitgeben (der
+Teil hinter `#k=` der Muse-Adresse). Im Repo-Ordner:
 
 ```bash
-node werkzeuge/verschluesseln.js ../foto.jpg ../maske.png --schluessel <Schlüssel>
+node werkzeuge/verschluesseln.js --schluessel <Schlüssel>
 ```
 
-Danach `familie.enc` committen und pushen. Die Maske muss dieselbe Größe wie
-das Foto haben (weiß = Familie inklusive Korb, Stange und Reisbündel).
+Ohne `--schluessel` lost das Werkzeug einen neuen Schlüssel aus und gibt ihn
+**einmal** im Terminal aus, zusammen mit der neuen Adresse; dann muss die
+Adresse im Muse neu eingetragen werden. Einzelne Dateien lassen sich auch
+angeben: Foto und Gesamtmaske als erste Pfade, die übrigen mit `--anna`,
+`--max`, `--valerie`, `--see`, `--leer`. Fehlt ein Zusatzbild, läuft das Bild
+ohne diesen Teil (ohne Personen-Masken zum Beispiel ohne Bewegung).
+
+Danach `familie.enc` committen und pushen. Alle Bilder haben 540 × 960
+Bildpunkte bzw. dasselbe Seitenverhältnis wie das Foto (Masken: weiß = Person
+bzw. See).
 
 ## Dateien
 
 - `index.html` – das Kunstwerk (eine Datei, ohne Build-Werkzeuge)
-- `familie.enc` – Foto und Maske, verschlüsselt
+- `familie.enc` – Foto und Masken, verschlüsselt
 - `config.json` – Einstellungen
 - `werkzeuge/verschluesseln.js` – lokales Werkzeug zum Verschlüsseln
 - `README.md` – diese Anleitung
@@ -119,6 +147,7 @@ Alle veränderbaren Daten stehen in `config.json`:
 | `schwellen` | `kalt_unter_grad` (Mütze und Handschuhe), `uv_ab` (Sonnenhut und Sonnencreme), `regen_ab_prozent` und `regen_stunden` (Gummistiefel). |
 | `szenen` | `an`: Szenen an (`true`) oder aus (`false`). `gag_alle_minuten`: Abstand zwischen zwei Gags als `[kleinster, größter]` Wert in Minuten. `enten_alle_minuten`: wie oft die Laufenten kommen. |
 | `wetter` | `echt`: echtes Wetter an oder aus. `aktualisieren_minuten`: wie oft abgerufen wird (mindestens 5). |
+| `bewegung` | `an`: Wind und kleine Bewegungen auf uns an oder aus. `kleine_bewegungen_alle_sekunden`: Abstand als `[kleinster, größter]` Wert in Sekunden, Standard `[20, 40]`. `schimmer`: leichter Schimmer in Kleidung und Haaren an oder aus. |
 | `anzeige` | `raster_px`: Bildpunkte je Rasterzelle oder `"auto"`. `max_fps`: höchste Bildrate, Standard 30. |
 
 ### Mülltonnen
@@ -154,12 +183,14 @@ doppelter Pixeldichte 20 Bildpunkte und ebenfalls 108 × 180. Das Foto wird
 „cover“ skaliert: Die Breite füllt das Raster, oben und unten fallen wenige
 Prozent weg.
 
-Alle Positionen im Bild (Hüte, Reisbündel, Stange, Enten-Weg, Reiher, Affe,
-Schmetterlinge, Regenbogen, Mond, Sternschnuppen) sind in Foto-Koordinaten
-festgelegt und stimmen deshalb bei jeder Rastergröße. Die Pixelfiguren (Affe,
-Enten, Schmetterlinge, Einhorn, Reiher, Mond) werden mit dem Raster mitskaliert,
-sodass sie im Verhältnis zum Bild mindestens so groß bleiben wie bei 90
-Spalten. Uhr, Temperatur, Symbole und Lichterkette hängen an den Ecken und
+Alle Positionen im Bild (Hüte, Reisbündel, Stange, Enten-Weg, Paulis Weg,
+Reiher, Affe, Schmetterlinge, Regenbogen, Mond, Sternschnuppen, Himmelsgrenze
+über dem Vulkan, See, Bewegungsbereiche von uns dreien) sind in
+Foto-Koordinaten festgelegt und stimmen deshalb bei jeder Rastergröße. Die
+Pixelfiguren (Pauli, Affe, Enten, Schmetterlinge, Einhorn, Reiher, Mond)
+werden mit dem Raster mitskaliert, sodass sie im Verhältnis zum Bild
+mindestens so groß bleiben wie bei 90 Spalten; Pauli und die Enten werden
+nach vorne bis aufs Doppelte größer. Uhr, Temperatur, Symbole und Lichterkette hängen an den Ecken und
 werden ab 150 Spalten ganzzahlig vergrößert, damit sie lesbar bleiben.
 
 Pro Gerät lässt sich die Anzeige an der Adresse überschreiben, ohne
@@ -210,9 +241,9 @@ Der Schlüssel `#k=…` kommt immer ganz ans Ende.
 
 | Parameter | Wirkung |
 |---|---|
-| `?dev=1` | Test-Modus: Steuerleiste (Jetzt, Zeitraffer, 8:00 Kindergarten, 19:00 Schlafen, 14:00, 23:00, Wetter-Vorschau Regen/Kalt/Sonne, Tonnen-Vorschau, Szenen-Knöpfe), Info-Zeile mit Sonnenzeiten, Wetterquelle, aktueller Szene, Tonnen und Hinweisen. Ein Tipp aufs Bild blendet die Steuerung aus. Ohne `?dev=1` blendet ein langes Drücken aufs Bild (3 Sekunden, ruhig halten) dieselbe Leiste ein, nochmal 3 Sekunden blendet sie aus; alle anderen Berührungen bleiben ohne Wirkung. |
+| `?dev=1` | Test-Modus: Steuerleiste (Jetzt, Zeitraffer, 8:00 Kindergarten, 19:00 Schlafen, 14:00, 23:00, Wetter-Vorschau Regen/Kalt/Sonne/Wind, Tonnen-Vorschau, Szenen-Knöpfe mit Pauli, Knöpfe für die drei kleinen Bewegungen), Info-Zeile mit Sonnen- und Mondstand, Sonnenzeiten, Wetterquelle, aktueller Szene, Tonnen und Hinweisen. Ein Tipp aufs Bild blendet die Steuerung aus. Ohne `?dev=1` blendet ein langes Drücken aufs Bild (3 Sekunden, ruhig halten) dieselbe Leiste ein, nochmal 3 Sekunden blendet sie aus; alle anderen Berührungen bleiben ohne Wirkung. |
 | `?t=2026-12-24T17:30` | Zeit simulieren. Die Uhr läuft ab diesem Moment weiter. Auch möglich: `?t=17:30` (heute) oder `?t=2026-12-24` (12 Uhr). |
-| `?wetter=regen` | Wetter erzwingen: `regen`, `kalt` oder `sonne`. |
+| `?wetter=regen` | Wetter erzwingen: `regen`, `kalt`, `sonne` oder `wind` (stürmisch, trocken). |
 | `?raster=`, `?fps=` | Anzeige für dieses Gerät, siehe „Anzeige und Leistung“. |
 
 Beispiele:
@@ -223,6 +254,7 @@ Beispiele:
 
 ## Stand
 
-Wir drei ist fertig und läuft. Die Kontroll-Screenshots der Abnahme (8:05,
-14:00, 19:05, 23:00, Regen, Kalt, Sonne, Tonnen-Vortag) liegen lokal in
+Wir drei läuft mit dem Grundsetting „Vulkansee“. Die Kontroll-Screenshots der
+Abnahme (zuletzt 14:00 mit Sonnenstrahl, 19:05 Gute Nacht, 23:00 mit
+Mondstrahl, Pauli im Vordergrund, Wind-Szene) liegen lokal in
 `balifoto/abnahme/`, nicht im Repo.

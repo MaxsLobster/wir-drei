@@ -32,12 +32,14 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
   <div class="lbl">Zeit</div>
   <div class="row"><button id="now" class="on">Jetzt</button><button id="play">Zeitraffer</button><button id="cd8">🎒 8:00 Kindergarten</button><button id="cd19">🌙 19:00 Schlafen</button><button id="t14">14:00</button><button id="t23">23:00</button></div>
   <div class="lbl">Wetter-Vorschau</div>
-  <div class="row" id="wxrow"><button data-wx="echt" class="on">Echt</button><button data-wx="regen">🌧 Regen</button><button data-wx="kalt">🥶 Kalt</button><button data-wx="sonne">☀️ Sonne</button></div>
+  <div class="row" id="wxrow"><button data-wx="echt" class="on">Echt</button><button data-wx="regen">🌧 Regen</button><button data-wx="kalt">🥶 Kalt</button><button data-wx="sonne">☀️ Sonne</button><button data-wx="wind">💨 Wind</button></div>
   <div class="lbl">Tonnen-Vorschau</div>
   <div class="row" id="tnrow"><button data-tonne="" class="on">Echt</button></div>
   <div class="lbl">Szenen</div>
-  <div class="row"><button data-scene="monkey">🐒 Affe</button><button data-scene="butter">🦋 Schmetterlinge</button><button data-scene="rain">🌈 Regenbogen + Einhorn</button><button data-scene="night">🌙 Gute Nacht</button><button data-scene="hat">👒 Hut lüften</button><button data-scene="ducks">🦆 Enten</button></div>
-  <div class="hint">Ohne ?dev=1: 3 Sekunden aufs Bild drücken blendet diese Leiste ein und aus. Mit ?dev=1: Tipp aufs Bild blendet sie aus. Zeit simulieren mit ?t=2026-12-24T17:30, Wetter erzwingen mit ?wetter=regen|kalt|sonne.</div>
+  <div class="row"><button data-scene="pauli">🐕 Pauli jagt die Enten</button><button data-scene="monkey">🐒 Affe</button><button data-scene="butter">🦋 Schmetterlinge</button><button data-scene="rain">🌈 Regenbogen + Einhorn</button><button data-scene="night">🌙 Gute Nacht</button><button data-scene="hat">👒 Hut lüften</button><button data-scene="ducks">🦆 Enten</button></div>
+  <div class="lbl">Wir drei</div>
+  <div class="row"><button data-fam="hop">🦘 Valerie hüpft</button><button data-fam="korb">🧺 Anna rückt den Korb</button><button data-fam="stange">🎋 Max wippt die Stange</button></div>
+  <div class="hint">Ohne ?dev=1: 3 Sekunden aufs Bild drücken blendet diese Leiste ein und aus. Mit ?dev=1: Tipp aufs Bild blendet sie aus. Zeit simulieren mit ?t=2026-12-24T17:30, Wetter erzwingen mit ?wetter=regen|kalt|sonne|wind.</div>
 </div>
 <script>
 // =====================================================================
@@ -46,7 +48,10 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 // =====================================================================
 
 // ---------- Grundlagen ----------
-const W=540,H=960,HORIZON=362;      // Foto-Koordinaten (9:16): alle Positionen im Bild rechnen darin, unabhängig vom Raster
+const W=540,H=960,SEE_OBEN=170,SEE_UNTEN=240;   // Foto-Koordinaten (9:16): alle Positionen im Bild rechnen darin, unabhängig vom Raster. Der See liegt etwa zwischen y=170 und 240
+// Himmelsgrenze über dem Vulkan, alle 12 Foto-Pixel gemessen: darüber Himmel mit Wolken, darunter der Vulkan
+const VULKAN=[166,166,159,149,138,139,135,125,116,108,111,98,92,85,81,82,72,72,63,57,51,72,75,75,75,75,76,72,71,70,66,56,62,66,70,76,87,87,92,98,103,110,115,123,131,136];
+const vulkanY=x=>{const f=clamp(x,0,W)/12,a=Math.min(Math.floor(f),VULKAN.length-1),b=Math.min(a+1,VULKAN.length-1);return lerp(VULKAN[a],VULKAN[b],f-a)};
 const SS=2;                          // das Foto wird mit doppelter Auflösung (1080×1920) abgetastet, damit auch feine Raster saubere Blockmittel bekommen
 // Raster: passt sich dem Bildschirm an (wie Lichtzeit). COLS/ROWS = Zellen, CP = Bildschirmpixel je Zelle, GP = Fuge,
 // Z = Vergrößerung von Uhr, Temperatur, Symbolen und Lichterkette (ganzzahlig), ZF = Vergrößerung der Figuren (im Verhältnis zum Bild mindestens wie bei 90 Spalten)
@@ -80,7 +85,7 @@ const dayKey=d=>d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
 const hourOf=d=>d.getHours()+d.getMinutes()/60+d.getSeconds()/3600;
 const fmtHM=T=>{const d=wall(T);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')};
 
-// Adresse: ?dev=1 Test-Modus, ?t=2026-12-24T17:30 Zeit simulieren, ?wetter=regen|kalt|sonne erzwingen, ?raster=12 ?fps=30 Anzeige
+// Adresse: ?dev=1 Test-Modus, ?t=2026-12-24T17:30 Zeit simulieren, ?wetter=regen|kalt|sonne|wind erzwingen, ?raster=12 ?fps=30 Anzeige
 const Q=new URLSearchParams(location.search),DEV=['1','true','ja'].includes(Q.get('dev')),URL_INFO=[];
 if(DEV)document.body.classList.add('dev');
 function parseT(s){s=s.trim();let m=/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/.exec(s);
@@ -103,6 +108,12 @@ const SID=(d,lw)=>rad*(280.16+360.9856235*d)-lw;
 function sunPos(T){const lw=rad*-LNG,phi=rad*LAT,d=toDays(T),M=sunM(d),L=sunL(M),dec=DEC(L,0),ra=RA(L,0),Hh=SID(d,lw)-ra;
   return{alt:Math.asin(Math.sin(phi)*Math.sin(dec)+Math.cos(phi)*Math.cos(dec)*Math.cos(Hh))/rad,
          az:Math.atan2(Math.sin(Hh),Math.cos(Hh)*Math.sin(phi)-Math.tan(dec)*Math.cos(phi))/rad};} // az: 0 = Süden, negativ = Osten
+// Mond wie bei suncalc: Höhe, Richtung (0 = Süden, negativ = Osten) und beleuchteter Anteil, für den Mondstrahl auf dem See
+function moonCoords(d){const L=rad*(218.316+13.176396*d),M=rad*(134.963+13.064993*d),Fm=rad*(93.272+13.229350*d),l=L+rad*6.289*Math.sin(M),b=rad*5.128*Math.sin(Fm);return{ra:RA(l,b),dec:DEC(l,b),dist:385001-20905*Math.cos(M)}}
+function moonPos(T){const lw=rad*-LNG,phi=rad*LAT,d=toDays(T),c=moonCoords(d),Hh=SID(d,lw)-c.ra;
+  return{alt:Math.asin(Math.sin(phi)*Math.sin(c.dec)+Math.cos(phi)*Math.cos(c.dec)*Math.cos(Hh))/rad,az:Math.atan2(Math.sin(Hh),Math.cos(Hh)*Math.sin(phi)-Math.tan(c.dec)*Math.cos(phi))/rad}}
+function moonFrac(T){const d=toDays(T),M=sunM(d),L=sunL(M),sd=DEC(L,0),sr=RA(L,0),m=moonCoords(d),sdist=149598000;
+  const ph=Math.acos(Math.sin(sd)*Math.sin(m.dec)+Math.cos(sd)*Math.cos(m.dec)*Math.cos(sr-m.ra)),inc=Math.atan2(sdist*Math.sin(ph),m.dist-sdist*Math.cos(ph));return(1+Math.cos(inc))/2}
 // Sonnenauf- und -untergang (Sonnenhöhe -0,833°) für den Berliner Kalendertag; Ergebnis je Tag zwischengespeichert
 const SUN_CACHE=new Map();
 function sunTimesDay(y,m,d){const k=y*10000+(m+1)*100+d;let v=SUN_CACHE.get(k);if(v)return v;
@@ -126,7 +137,8 @@ let SCHW={kalt:5,uv:5,regen:50,regenH:6};
 let SZENEN={an:true,min:10,max:15,enten:6};
 let WETTER={echt:true,min:15};
 let ANZ={raster_px:0,max_fps:30},ANZ_SRC={};
-const CFG_KEYS=['ort','countdowns','gute_nacht','tonnen','tonnen_anzeige','schwellen','szenen','wetter','anzeige'];
+let BEWEGUNG={an:true,min:20,max:40,schimmer:true};
+const CFG_KEYS=['ort','countdowns','gute_nacht','tonnen','tonnen_anzeige','schwellen','szenen','wetter','anzeige','bewegung'];
 const TAGK={so:0,mo:1,di:2,mi:3,do:4,fr:5,sa:6};
 const pUhr=v=>{const m=/^(\d{1,2}):(\d{2})$/.exec(String(v).trim());if(!m)return null;const a=+m[1],b=+m[2];return b<60&&a*60+b<=1440?a*60+b:null;};
 const pISO=v=>{const m=/^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(v).trim());if(!m)return null;const y=+m[1],mo=+m[2],d=+m[3];if(mo<1||mo>12||d<1||d>31)return null;return{y,m:mo-1,d};};
@@ -156,6 +168,8 @@ function applyConfig(j){const bad=[],notes=[],obj=v=>!!v&&typeof v==='object'&&!
   part('wetter',w=>{WETTER={echt:or(take(w.echt,pJaNein,'wetter echt'),WETTER.echt),min:or(take(w.aktualisieren_minuten,pZahl(5,180),'wetter aktualisieren_minuten'),WETTER.min)};});
   part('anzeige',a=>{const r=take(a.raster_px,v=>v==='auto'?0:pZahl(3,60,true)(v),'anzeige raster_px');if(r!==undefined){ANZ.raster_px=r;if(r)ANZ_SRC.raster_px='config.json';}
     const f=take(a.max_fps,pZahl(5,120),'anzeige max_fps');if(f!==undefined){ANZ.max_fps=f;if(f!==30)ANZ_SRC.max_fps='config.json';}});
+  part('bewegung',b=>{BEWEGUNG.an=or(take(b.an,pJaNein,'bewegung an'),BEWEGUNG.an);BEWEGUNG.schimmer=or(take(b.schimmer,pJaNein,'bewegung schimmer'),BEWEGUNG.schimmer);
+    if(b.kleine_bewegungen_alle_sekunden!==undefined){const g=b.kleine_bewegungen_alle_sekunden;if(Array.isArray(g)&&g.length===2&&pZahl(3,3600)(g[0])!==null&&pZahl(3,3600)(g[1])!==null&&g[1]>=g[0]){BEWEGUNG.min=g[0];BEWEGUNG.max=g[1];}else bad.push('bewegung kleine_bewegungen_alle_sekunden');}});
   const unk=Object.keys(j).filter(k=>k[0]!=='_'&&!CFG_KEYS.includes(k));if(unk.length)notes.push('unbekannt: '+unk.join(', '));
   const msg=[];if(bad.length)msg.push('ungültig: '+bad.join(', ')+' (dort gilt der Standard)');CFG_INFO=msg.concat(notes).length?'config.json: '+msg.concat(notes).join('; '):'';}
 // Geräteuhr prüfen: weicht sie mehr als eine Minute vom Server-Zeitstempel ab, rechnet Wir drei mit der Serverzeit
@@ -171,10 +185,10 @@ function urlAnzeige(){const r=Q.get('raster');if(r!==null){if(r==='auto'){ANZ.ra
 
 // ---------- Echtes Wetter (Open-Meteo, wie Lichtzeit): alle 15 Minuten, letzter Stand im Browser, ohne Internet weiter ----------
 const WX_KEY='wirdrei_wetter',WX_MAX_ALTER_H=6;
-const WXDEMO={regen:{temp:9,rainNow:true,rainSoon:true,wind:30,uv:0,text:'Regen, 9 °C'},kalt:{temp:-3,rainNow:false,rainSoon:false,wind:12,uv:1,text:'kalt, -3 °C'},sonne:{temp:24,rainNow:false,rainSoon:false,wind:6,uv:7,text:'Sonne, 24 °C, UV 7'}};
+const WXDEMO={regen:{temp:9,rainNow:true,rainSoon:true,wind:30,uv:0,text:'Regen, 9 °C'},kalt:{temp:-3,rainNow:false,rainSoon:false,wind:12,uv:1,text:'kalt, -3 °C'},sonne:{temp:24,rainNow:false,rainSoon:false,wind:6,uv:7,text:'Sonne, 24 °C, UV 7'},wind:{temp:11,rainNow:false,rainSoon:false,wind:34,uv:1,text:'stürmisch, 11 °C, Wind 34 km/h'}};
 const WXSIM={temp:7,rainNow:false,rainSoon:false,wind:9,uv:1,text:'simuliert, 7 °C'};
 const WX={mode:'echt',live:null,fetched:0,err:'',wasRain:null};
-const WX_FORCE=(()=>{const k=(Q.get('wetter')||'').trim().toLowerCase();if(!k)return null;if(!WXDEMO[k]){URL_INFO.push('?wetter='+k+' unbekannt (regen, kalt, sonne)');return null;}return k;})();
+const WX_FORCE=(()=>{const k=(Q.get('wetter')||'').trim().toLowerCase();if(!k)return null;if(!WXDEMO[k]){URL_INFO.push('?wetter='+k+' unbekannt (regen, kalt, sonne, wind)');return null;}return k;})();
 if(WX_FORCE)WX.mode=WX_FORCE;
 function wxBuild(j){const c=j.current,h=j.hourly;if(!c||!h||!Array.isArray(h.precipitation_probability))throw new Error('unerwartete Antwort');
   const num=v=>typeof v==='number'&&isFinite(v)?v:null,code=num(c.weather_code)||0;
@@ -250,31 +264,34 @@ function fit(){const dpr=window.devicePixelRatio||1,PW=Math.max(1,Math.round(inn
   Z=Math.max(1,Math.round(COLS/100));ZF=Math.max(1,COLS/90);
   canvas.width=COLS*CP;canvas.height=ROWS*CP;
   grid=new Path2D();for(let i=1;i<=COLS;i++)grid.rect(i*CP-GP,0,GP,canvas.height);for(let j=1;j<=ROWS;j++)grid.rect(0,j*CP-GP,canvas.width,GP);
-  if(draw)draw=BILD?build(BILD.col,BILD.msk):leer();}
+  if(draw)draw=BILD?build(BILD):leer();}
 let fitT=0;addEventListener('resize',()=>{clearTimeout(fitT);fitT=setTimeout(fit,250);});
 
-// ---------- Engine (aus der Vorlage): Grundfarben, Wind, Wolken, Glitzern, Gags, Lichtwellen, Nacht-Dither ----------
-function engine(col,msk,cfg){
-  const cols=COLS,rows=ROWS,F=ZF;
+// ---------- Engine (aus der Vorlage): Grundfarben, Wind, Wolken, Glitzern, Bewegung, Gags, Lichtwellen, Lichtstrahl, Nacht-Dither ----------
+// B: entschlüsselte Bilder als Pixel (col 1080×1920, msk und die übrigen 540×960). Fehlen Personen-Masken, See-Maske oder leeres Bild, läuft das Bild ohne diese Teile.
+function engine(B,cfg){
+  const col=B.col,msk=B.msk,cols=COLS,rows=ROWS,F=ZF;
   // Foto „cover“: die Breite füllt das Raster, oben und unten wird minimal beschnitten. s = Zellen je Foto-Einheit
   const s=Math.max(cols/W,rows/H),ox=(W-cols/s)/2,oy=(H-rows/s)/2;
   const ci=x=>(x-ox)*s,cj=y=>(y-oy)*s,px=i=>ox+i/s,py=j=>oy+j/s;
   const SW=W*SS,SH=H*SS;
-  const maskAt=(x,y)=>msk[((clamp(y|0,0,H-1))*W+clamp(x|0,0,W-1))*4]/255;
+  const at=(a,x,y)=>a?a[((clamp(y|0,0,H-1))*W+clamp(x|0,0,W-1))*4]/255:0;   // Masken-Wert (0 bis 1) an einer Foto-Stelle
   const colAt=(x,y)=>{const i=((clamp(y*SS|0,0,SH-1))*SW+clamp(x*SS|0,0,SW-1))*4;return[col[i],col[i+1],col[i+2]]};
-  const N=cols*rows,base=new Float32Array(N*3),fam=new Uint8Array(N),kind=new Uint8Array(N);
-  // Blockmittel aus dem Foto (jede Zelle mittelt ihren Ausschnitt), leicht gedämpft wie Lichtzeit
-  for(let j=0;j<rows;j++){const y0=clamp(Math.floor(py(j)*SS),0,SH-1),y1=clamp(Math.ceil(py(j+1)*SS)-1,y0,SH-1);
-    for(let i=0;i<cols;i++){let r=0,g=0,b=0,n=0;const x0=clamp(Math.floor(px(i)*SS),0,SW-1),x1=clamp(Math.ceil(px(i+1)*SS)-1,x0,SW-1);
-      for(let y=y0;y<=y1;y++)for(let xx=x0;xx<=x1;xx++){const k=(y*SW+xx)*4;r+=col[k];g+=col[k+1];b+=col[k+2];n++}
-      r/=n;g/=n;b/=n;const m=(r+g+b)/3,o=(j*cols+i)*3;
-      base[o]=lerp(r,m,.12)*.97+6;base[o+1]=lerp(g,m,.12)*.97+6;base[o+2]=lerp(b,m,.12)*.97+8;
-      const cx=px(i+.5),cy=py(j+.5),f=maskAt(cx,cy)>.5;fam[j*cols+i]=f?1:0;
-      kind[j*cols+i]=f?1:(cy<HORIZON?2:3);}}
+  const N=cols*rows,base=new Float32Array(N*3),fam=new Uint8Array(N),kind=new Uint8Array(N),plate=B.leer?new Float32Array(N*3):null;
+  // Blockmittel: jede Zelle mittelt ihren Ausschnitt (Quelle in sc-facher Auflösung), leicht gedämpft wie Lichtzeit
+  const mittel=(src,sc,i,j,out,o)=>{const w=W*sc,h=H*sc,y0=clamp(Math.floor(py(j)*sc),0,h-1),y1=clamp(Math.ceil(py(j+1)*sc)-1,y0,h-1),x0=clamp(Math.floor(px(i)*sc),0,w-1),x1=clamp(Math.ceil(px(i+1)*sc)-1,x0,w-1);
+    let r=0,g=0,b=0,n=0;for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const k=(y*w+x)*4;r+=src[k];g+=src[k+1];b+=src[k+2];n++}
+    r/=n;g/=n;b/=n;const m=(r+g+b)/3;out[o]=lerp(r,m,.12)*.97+6;out[o+1]=lerp(g,m,.12)*.97+6;out[o+2]=lerp(b,m,.12)*.97+8};
+  // Zellarten: 1 Familie, 2 Himmel (Wolken), 3 Terrassen und Feld (Wind), 4 Vulkan, 5 See (Wind, Lichtstrahl)
+  for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){const k=j*cols+i,o=k*3;mittel(col,SS,i,j,base,o);if(plate)mittel(B.leer,1,i,j,plate,o);
+    const cx=px(i+.5),cy=py(j+.5),f=at(msk,cx,cy)>.5,see=B.see?at(B.see,cx,cy)>.5:(cy>=SEE_OBEN&&cy<SEE_UNTEN);fam[k]=f?1:0;
+    kind[k]=f?1:see?5:cy<vulkanY(cx)?2:cy<SEE_OBEN?4:3;}
   // Wasser in den Terrassen: helle, graue Zellen glitzern
   const glints=[];{const r=rng(cfg.seed||1);for(let k=0;k<N;k++){if(kind[k]!==3)continue;const o=k*3,L=(base[o]+base[o+1]+base[o+2])/3;if(L>165&&Math.abs(base[o]-base[o+2])<22&&r()<.5)glints.push({k,ph:r()*6.28,f:lerp(.5,1.4,r())})}}
-  // Wolken: weiches Rauschen, das langsam zieht
-  const NW=cols*3,NH=Math.max(2,Math.ceil(cj(HORIZON)))+2,noise=new Float32Array(NW*NH);
+  // Seezellen für den Lichtstrahl: u = 0 am fernen Ufer, 1 am nahen
+  const lake=[];{const r=rng((cfg.seed||1)+3);for(let k=0;k<N;k++)if(kind[k]===5){const i=k%cols,j=(k/cols)|0;lake.push({k,i,j,x:px(i+.5),u:clamp((py(j+.5)-SEE_OBEN)/(SEE_UNTEN-SEE_OBEN),0,1),ph:r()*6.28,f:lerp(.6,1.5,r())})}}
+  // Wolken: weiches Rauschen, das langsam zieht (nur im Himmelsstreifen über dem Vulkan)
+  const NW=cols*3,NH=Math.max(2,Math.ceil(cj(SEE_OBEN)))+2,noise=new Float32Array(NW*NH);
   {const r=rng(cfg.seed+7),g=cv(Math.ceil(NW/10),Math.ceil(NH/6)),gx=g.getContext('2d'),d=gx.createImageData(g.width,g.height);
    for(let i=0;i<d.data.length;i+=4){const v=r()*255;d.data[i]=d.data[i+1]=d.data[i+2]=v;d.data[i+3]=255}gx.putImageData(d,0,0);
    const big=cv(NW,NH),bx=big.getContext('2d',{willReadFrequently:true});bx.imageSmoothingEnabled=true;bx.imageSmoothingQuality='high';bx.drawImage(g,0,0,NW,NH);
@@ -288,12 +305,12 @@ function engine(col,msk,cfg){
     const vr=((i*7+j*13)%5-2)*9,under=e<1?(h===HATV?[206+vr,168+vr,104+vr*.6]:[66+vr*.5,48+vr*.5,38]):(h===HATV?mix(L0,R0,k):colAt(cx,h.ay-14));
     L.push({i,j,k:j*cols+i,under})}}return L};
   const HV=hatCells(HATV),HM=hatCells(HATM);
-  // Puffer
+  // Puffer: cr = Farbe, glow = deckende Leuchtpunkte, addB = additives Licht (Lichtstrahl), beides nach der Tageszeit-Tönung
   const cr=new Float32Array(N*3),buf=cv(cols,rows),bx=buf.getContext('2d'),bimg=bx.createImageData(cols,rows),bu=new Uint32Array(bimg.data.buffer);
-  const dist=new Float32Array(N),glow=new Float32Array(N*4);let lastL='';
+  const dist=new Float32Array(N),glow=new Float32Array(N*4),addB=new Float32Array(N*3);let lastL='';
   // Figuren: jeder Figurenpunkt deckt ceil-gerundet F Zellen, so bleibt eine Figur im Verhältnis zum Bild mindestens so groß wie bei 90 Spalten
   const fs0=c=>Math.ceil(c*F),fs1=c=>Math.ceil((c+1)*F);
-  const S={cols,rows,cr,fam,kind,base,ci,cj,px,py,s,F,Z,hc:Math.floor(cols/Z),hr:Math.floor(rows/Z),
+  const S={cols,rows,cr,fam,kind,base,plate,lake,B,at,ci,cj,px,py,s,F,Z,hc:Math.floor(cols/Z),hr:Math.floor(rows/Z),parts:null,
     sz:(n,z=1)=>Math.ceil(n*z*F),                         // Größe von n Figurenpunkten in Zellen
     put(i,j,c,a=1,behind=false){i=Math.round(i);j=Math.round(j);if(i<0||j<0||i>=cols||j>=rows)return;if(behind&&fam[j*cols+i])return;const o=(j*cols+i)*3;cr[o]=lerp(cr[o],c[0],a);cr[o+1]=lerp(cr[o+1],c[1],a);cr[o+2]=lerp(cr[o+2],c[2],a)},
     // ein Figurenpunkt (dx,dy) relativ zum Anker (i,j), auf Figurengröße gebracht
@@ -305,9 +322,12 @@ function engine(col,msk,cfg){
       for(const h of L){const o=h.k*3;cr[o]=h.under[0];cr[o+1]=h.under[1];cr[o+2]=h.under[2]}
       L.forEach((h,n)=>S.put(h.i+dx,h.j-dy,tmp[n]))},
     glow(i,j,c,a=1,behind=false){i=Math.round(i);j=Math.round(j);if(i<0||j<0||i>=cols||j>=rows||a<=0)return;const k=j*cols+i;if(behind&&fam[k])return;const o=k*4;if(a>=glow[o+3]){glow[o]=c[0];glow[o+1]=c[1];glow[o+2]=c[2];glow[o+3]=Math.min(1,a)}},
-    glowSprite(name,i,j,a=1,flip=false,front=false,z=1){const sp=SPR[name],w=sp[0].length,zz=z*F;i=Math.round(i);j=Math.round(j);
+    // Leuchtpunkt nur auf einer Zellart (z. B. 2 = Himmel: Mond und Sternschnuppen verschwinden hinter dem Vulkan)
+    glowK(i,j,c,a,kd){i=Math.round(i);j=Math.round(j);if(i<0||j<0||i>=cols||j>=rows||kind[j*cols+i]!==kd)return;S.glow(i,j,c,a)},
+    add(k,c,a){if(a<=0)return;const o=k*3;addB[o]+=c[0]*a;addB[o+1]+=c[1]*a;addB[o+2]+=c[2]*a},
+    glowSprite(name,i,j,a=1,flip=false,front=false,z=1,kd=0){const sp=SPR[name],w=sp[0].length,zz=z*F;i=Math.round(i);j=Math.round(j);
       for(let r=0;r<sp.length;r++){const y0=Math.ceil(r*zz),y1=Math.ceil((r+1)*zz);for(let c=0;c<w;c++){const ch=sp[r][flip?w-1-c:c];if(ch==='.')continue;const x0=Math.ceil(c*zz),x1=Math.ceil((c+1)*zz);
-        for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)S.glow(i+x,j+y,COL[ch],a,!front)}}},
+        for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){if(kd)S.glowK(i+x,j+y,COL[ch],a,kd);else S.glow(i+x,j+y,COL[ch],a,!front)}}}},
     // Uhr, Temperatur, Symbole, Lichterkette: Z×Z Zellen je Punkt, Koordinaten in Anzeigepunkten
     blk(i,j,c,a=1,behind=false){i=Math.round(i)*Z;j=Math.round(j)*Z;for(let y=0;y<Z;y++)for(let x=0;x<Z;x++)S.put(i+x,j+y,c,a,behind)},
     glowBlk(i,j,c,a=1,behind=false){i=Math.round(i)*Z;j=Math.round(j)*Z;for(let y=0;y<Z;y++)for(let x=0;x<Z;x++)S.glow(i+x,j+y,c,a,behind)},
@@ -316,24 +336,30 @@ function engine(col,msk,cfg){
   {let r=0,g=0,b=0;for(let k=0;k<N;k++){r+=base[k*3];g+=base[k*3+1];b+=base[k*3+2]}S.gridCol=[r/N*.5|0,g/N*.5|0,b/N*.55|0]}
   cfg.init&&cfg.init(S);
   return t=>{const ts=t/1000;
-    const look=cfg.look(S,ts);
-    // 1) Grundfarben + Wind + Wolken
+    const look=cfg.look(S,ts),wind=cfg.wind()||1;
+    // 1) Grundfarben + Wind auf Terrassen und See + Wolken im Himmel
     const gpos=((ts%11)/11)*(W*1.6+400)-200;
-    for(let j=0;j<rows;j++){const y=py(j);const dep=smooth((y-HORIZON)/560);
+    for(let j=0;j<rows;j++){const y=py(j);const dep=smooth((y-SEE_UNTEN)/600);
       for(let i=0;i<cols;i++){const k=j*cols+i,o=k*3;let r=base[o],g=base[o+1],b=base[o+2];const kd=kind[k];
-        if(kd===3){const gust=Math.exp(-((((px(i)+y*.35)-gpos)/110)**2)),amp=F*(cfg.wind()||1)*(.25+1.1*dep)*(.45+1.2*gust);
+        if(kd===3){const gust=Math.exp(-((((px(i)+y*.35)-gpos)/110)**2)),amp=F*wind*(.25+1.1*dep)*(.45+1.2*gust);
           const off=amp*Math.sin(y*.058+ts*.9+i*.04/F),si=i+off,i0=Math.floor(si),f=si-i0;
           const ka=j*cols+clamp(i0,0,cols-1),kb=j*cols+clamp(i0+1,0,cols-1);
           if(!fam[ka]&&!fam[kb]){r=lerp(base[ka*3],base[kb*3],f);g=lerp(base[ka*3+1],base[kb*3+1],f);b=lerp(base[ka*3+2],base[kb*3+2],f)}
           const lift=gust*.05;r*=1+lift;g*=1+lift;b*=1+lift*.6;}
+        else if(kd===5){// See: der Wind kräuselt die Fläche, Zeile für Zeile leicht versetzt
+          const amp=F*wind*.35,off=amp*Math.sin(y*.21+ts*1.3+i*.09/F),si=i+off,i0=Math.floor(si),f=si-i0,ka=j*cols+clamp(i0,0,cols-1),kb=j*cols+clamp(i0+1,0,cols-1);
+          if(kind[ka]===5&&kind[kb]===5){r=lerp(base[ka*3],base[kb*3],f);g=lerp(base[ka*3+1],base[kb*3+1],f);b=lerp(base[ka*3+2],base[kb*3+2],f)}
+          const sh=.03*Math.min(wind,2)*Math.sin(ts*1.7+i*.5/F+y*.3);r*=1+sh;g*=1+sh;b*=1+sh}
         else if(kd===2){const n=noiseAt(i*3+ts*(cfg.cloud||1.1),j),c=(n-.5)*2;r+=c*16;g+=c*16;b+=c*18;}
         cr[o]=r;cr[o+1]=g;cr[o+2]=b}}
     // Glitzern
     for(const p of glints){const v=Math.sin(ts*p.f*1.3+p.ph);if(v>.8){const a=(v-.8)/.2*.55,o=p.k*3;cr[o]=lerp(cr[o],255,a);cr[o+1]=lerp(cr[o+1],255,a);cr[o+2]=lerp(cr[o+2],252,a)}}
+    // Wir bewegen uns mit: Wind, kleine Bewegungen, Schimmer
+    cfg.famMove&&cfg.famMove(S,ts);
     // 2) Gags
-    glow.fill(0);cfg.gags(S,ts,look);
+    glow.fill(0);addB.fill(0);cfg.gags(S,ts,look);
     // 3) Endfarbe: Lichtwellen wie bei Lichtzeit + Licht der Tageszeit
-    const lk=look.lx+'|'+look.ly;if(lk!==lastL){lastL=lk;for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){const cx=px(i+.5),cy=py(j+.5),dx=(cx-look.lx)/6,dy=(cy-look.ly)/6*(cy>HORIZON?1.6:1);dist[j*cols+i]=Math.sqrt(dx*dx+dy*dy)}}
+    const lk=look.lx+'|'+look.ly;if(lk!==lastL){lastL=lk;for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){const cx=px(i+.5),cy=py(j+.5),dx=(cx-look.lx)/6,dy=(cy-look.ly)/6*(cy>SEE_OBEN?1.6:1);dist[j*cols+i]=Math.sqrt(dx*dx+dy*dy)}}
     const ph=ts*1.4,amp=look.amp,tn=look.tint,na=look.night||0,fl=look.famLift||0;
     for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){const k=j*cols+i,o=k*3;let r=cr[o],g=cr[o+1],b=cr[o+2];
       const lum=(0.3*r+0.59*g+0.11*b)/255,isF=fam[k];
@@ -343,7 +369,8 @@ function engine(col,msk,cfg){
       // Dither nur in der Landschaft und nur in einem Viertel der Zellen, weich eingemischt; die Familie bleibt ohne Muster im Mondlicht, warme helle Lichter bleiben ausgenommen
       if(na>0&&!isF){const bt=BAYER[(i&3)+((j&3)<<2)]/16;if(bt<na*.25&&!(r>b+50&&lum>.3)){const b2=BAYER[((i+2)&3)+(((j+1)&3)<<2)]/16,l2=(0.3*r+0.59*g+0.11*b)/255,lv=clamp(Math.floor(l2*4.4+b2*.9-.25),0,4),p=PAL_N[lv],m=.65*na;r=lerp(r,p[0],m);g=lerp(g,p[1],m);b=lerp(b,p[2],m)}}
       const w=.5+.5*Math.sin(ph-dist[k]/16),f=.9+amp*w*(.4+.6*Math.sqrt(lum));
-      r*=f;g*=f;b*=f;const ga=glow[k*4+3];if(ga>0){r=lerp(r,glow[k*4],ga);g=lerp(g,glow[k*4+1],ga);b=lerp(b,glow[k*4+2],ga)}
+      r*=f;g*=f;b*=f;r+=addB[o];g+=addB[o+1];b+=addB[o+2];
+      const ga=glow[k*4+3];if(ga>0){r=lerp(r,glow[k*4],ga);g=lerp(g,glow[k*4+1],ga);b=lerp(b,glow[k*4+2],ga)}
       bu[k]=(255<<24)|(clamp(b,0,255)<<16)|(clamp(g,0,255)<<8)|clamp(r,0,255)}
     bx.putImageData(bimg,0,0);ctx.imageSmoothingEnabled=false;ctx.drawImage(buf,0,0,canvas.width,canvas.height);
     const gc=look.gridCol||S.gridCol;ctx.fillStyle=`rgb(${gc})`;ctx.fill(grid);}}
@@ -362,6 +389,11 @@ const GLY={"0":["###","#.#","#.#","#.#","###"],"1":[".#.","##.",".#.",".#.","###
 const gOn=(ch,x,y)=>{const g=GLY[ch]||GLY[" "];return y>=0&&y<5&&x>=0&&x<3&&g[y][x]==='#'};
 const BIG={"0":[".###.","#...#","#...#","#...#","#...#","#...#",".###."],"1":["..#..",".##..","..#..","..#..","..#..","..#..",".###."],"2":[".###.","#...#","....#","...#.","..#..",".#...","#####"],"3":[".###.","#...#","....#","..##.","....#","#...#",".###."],"4":["...#.","..##.",".#.#.","#..#.","#####","...#.","...#."],"5":["#####","#....","####.","....#","....#","#...#",".###."],"6":["..##.",".#...","#....","####.","#...#","#...#",".###."],"7":["#####","....#","...#.","..#..",".#...",".#...",".#..."],"8":[".###.","#...#","#...#",".###.","#...#","#...#",".###."],"9":[".###.","#...#","#...#",".####","....#","...#.",".##.."]," ":[".....",".....",".....",".....",".....",".....","....."]};
 const bOn=(ch,x,y)=>{const g=BIG[ch]||BIG[" "];return y>=0&&y<7&&x>=0&&x<5&&g[y][x]==='#'};
+// Schrift und Symbole: weicher dunkler Rand rundum plus Schlagschatten, damit sie über Vulkan, See und Wolken lesbar bleiben. P: [x, y, Farbe, Deckkraft, Nachtfarbe]
+const HUD_SCHATTEN=[30,36,50],HUD_RAND=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[2,1],[1,2],[2,2]];
+function hudPaint(S,P,n){const k=1-n;if(k>0){for(const p of P)for(const[dx,dy]of HUD_RAND)paint(S,p[0]+dx,p[1]+dy,HUD_SCHATTEN,.2*p[3]*k,0);
+    for(const p of P)paint(S,p[0]+1,p[1]+1,HUD_SCHATTEN,.85*p[3]*k,0)}
+  for(const p of P)paint(S,p[0],p[1],p[2],p[3],n,p[4])}
 function skyClock(C){const st=[0,1,2,3].map(()=>({from:' ',to:' ',t0:null}));let last='';const dur=1.1;
   return (S,L,ts)=>{const n=clamp(L.night*1.2,0,1),tt=L.hhmm,tot=26,x0=S.hc-3-tot,y0=4;
     if(tt!==last){for(let i=0;i<4;i++)if(tt[i]!==(last[i]||' ')){st[i].from=st[i].to;st[i].to=tt[i];st[i].t0=last?ts+i*.08:null}last=tt}
@@ -371,8 +403,7 @@ function skyClock(C){const st=[0,1,2,3].map(()=>({from:' ',to:' ',t0:null}));let
         if(p<1&&bOn(s.from,x,y)){const q=smooth(clamp(p*1.6-r*.5,0,1));if(q<1)P.push([bx+x+Math.round((r2-.5)*6*q),y0+y-Math.round(q*(4+r*6)),1-q])}
         if(bOn(s.to,x,y)){const q=smooth(clamp(p*1.5-.35-r*.35,0,1));if(q>0)P.push([bx+x+Math.round((r2-.5)*5*(1-q)),y0+y-Math.round((1-q)*(5+r*5)),q])}}});
     for(const yy of [2,4])P.push([x0+12,y0+yy,1]);
-    for(const[x,y,a]of P){paint(S,x+1,y+1,C.shadow,.8*a*(1-n),0);paint(S,x+1,y,C.shadow,.35*a*(1-n),0)}
-    for(const[x,y,a]of P)paint(S,x,y,C.fg,a,n,C.fgN)}}
+    hudPaint(S,P.map(([x,y,a])=>[x,y,C.fg,a,C.fgN]),n)}}
 const clock=skyClock({fg:[255,255,250],fgN:[246,244,236],shadow:[58,66,80]});
 
 // ---------- Oben links (Anordnung C): Temperatur und kleine Symbole in einer Reihe ----------
@@ -389,14 +420,12 @@ function needs(L,wx,d){const out=[],tn=tonneJetzt(d);
   if(wx.temp<SCHW.kalt){out.push({k:'muetze'});out.push({k:'hand'})}
   if(wx.uv>=SCHW.uv&&L.sunUp){out.push({k:'hut'});out.push({k:'creme'})}
   return out}
-function drawIcon(S,ic,x,y,n,pal){const R=ic.rows,P=pal||ic.pal;for(let r=0;r<R.length;r++)for(let c=0;c<R[r].length;c++){const ch=R[r][c];if(ch==='.')continue;
-  paint(S,x+c+1,y+r+1,[58,66,80],.4*(1-n),0);paint(S,x+c,y+r,P[ch],1,n,P[ch])}}
+function drawIcon(S,ic,x,y,n,pal){const R=ic.rows,P=pal||ic.pal,Q=[];for(let r=0;r<R.length;r++)for(let c=0;c<R[r].length;c++){const ch=R[r][c];if(ch!=='.')Q.push([x+c,y+r,P[ch],1,P[ch]])}hudPaint(S,Q,n)}
 // Symbolreihe, unten bündig, nach rechts; am Abholtag wackelt die Tonne
 function miniRow(S,list,x,yb,n,ts){for(const it of list){const ic=MINI[it.k],w=ic.rows[0].length,h=ic.rows.length,y=yb-h+1;
   if(it.two){drawIcon(S,ic,x,y,n);drawIcon(S,ic,x+w+1,y,n);x+=w*2+1+2}
   else{const wig=it.heute?Math.round(Math.sin(ts*7)):0;drawIcon(S,ic,x+wig,y+(it.heute&&Math.floor(ts*2)%2?-1:0),n,it.pal);x+=w+2}}}
-function text(S,str,x0,y,n,fg=[255,255,250]){for(let k=0;k<str.length;k++)for(let yy=0;yy<5;yy++)for(let xx=0;xx<3;xx++)if(gOn(str[k],xx,yy)){
-  paint(S,x0+k*4+xx+1,y+yy+1,[58,66,80],.8*(1-n),0);paint(S,x0+k*4+xx,y+yy,fg,1,n,[246,244,236])}}
+function text(S,str,x0,y,n,fg=[255,255,250]){const P=[];for(let k=0;k<str.length;k++)for(let yy=0;yy<5;yy++)for(let xx=0;xx<3;xx++)if(gOn(str[k],xx,yy))P.push([x0+k*4+xx,y+yy,fg,1,[246,244,236]]);hudPaint(S,P,n)}
 const tempStr=wx=>{const tp=Math.round(wx.temp);return(tp<0?'-':'')+Math.abs(tp)+'°'};
 
 // ---------- Countdown-Lichterkette im Himmel unter der Uhr: 15 Birnen, jede Minute geht eine aus ----------
@@ -413,10 +442,10 @@ function lichterkette(S,ts,cd,n){if(!cd)return;const p=cd.p,N=15,left=N-Math.flo
 
 // ---------- Szenen-Ablauf: immer nur ein Gag, Uhr und Symbole bleiben frei ----------
 const EV=[];
-const SCN={monkey:{dur:23,name:'Affe klaut ein Reisbündel'},butter:{dur:21,name:'Schmetterlinge besuchen Valerie'},hat:{dur:7,name:'Valerie und Max lüften die Hüte'},rain:{dur:40,name:'Regenbogen mit Einhorn'},night:{dur:32,name:'Gute Nacht'},ducks:{dur:24,name:'Laufenten mit Küken'}};
-const ROT=['monkey','butter','hat'];
+const SCN={pauli:{dur:17,name:'Pauli jagt die Enten'},monkey:{dur:23,name:'Affe klaut ein Reisbündel'},butter:{dur:21,name:'Schmetterlinge besuchen Valerie'},hat:{dur:7,name:'Valerie und Max lüften die Hüte'},rain:{dur:40,name:'Regenbogen mit Einhorn'},night:{dur:32,name:'Gute Nacht'},ducks:{dur:24,name:'Laufenten mit Küken'}};
+const ROT=['pauli','monkey','butter','hat'];
 let nextGag=45,gagIdx=0,nextDucks=20,nextShoot=0,lastMin=null;
-function start(type,ts){if(EV.some(e=>e.type===type))return;if(type==='night')for(let i=EV.length-1;i>=0;i--)if(EV[i].type!=='ducks')EV.splice(i,1);EV.push({type,t0:ts})}
+function start(type,ts){if(EV.some(e=>e.type===type))return;if(type==='ducks'&&EV.some(e=>e.type==='pauli'))return;if(type==='pauli')for(let i=EV.length-1;i>=0;i--)if(EV[i].type==='ducks')EV.splice(i,1);if(type==='night')for(let i=EV.length-1;i>=0;i--)if(EV[i].type!=='ducks')EV.splice(i,1);EV.push({type,t0:ts})}
 function running(type,ts){const e=EV.find(e=>e.type===type);return e?ts-e.t0:-1}
 function schedule(ts,L,d){
   // Gute-Nacht-Moment beim Überschreiten der eingestellten Uhrzeit (auch im Sommer, wenn es noch hell ist)
@@ -430,6 +459,26 @@ function schedule(ts,L,d){
 function szeneText(ts){const e=EV.filter(e=>e.type!=='ducks').map(e=>SCN[e.type].name);const d=EV.find(e=>e.type==='ducks');
   let s='Szene: '+(e.length?e.join(', '):'keine');if(d)s+=' + Enten';if(SZENEN.an&&!e.length)s+=' (nächster Gag in '+Math.max(0,Math.round((nextGag-ts)/60))+' min)';return s}
 
+// ---------- Lichtstrahl auf dem See wie bei Lichtzeit (L_beam): tagsüber unter der Sonne, nachts unter dem Mond, glitzert, nur innerhalb der See-Maske ----------
+// Blick nach Süden: Osten links, Westen rechts. Richtung (Azimut in Grad, 0 = Süden) in Foto-x
+const skyX=az=>clamp(W/2+az/90*250,24,W-24);
+function strahlen(T,ST,sun){const out=[],dk=smooth((sun.alt+4)/6);
+  if(dk>0)out.push({x:skyX(sun.az),str:dk*(.32+.4*smooth(sun.alt/25)),col:mix([255,180,110],[255,245,225],smooth(sun.alt/15)),mond:false});
+  if(dk<1){const m=moonPos(T),fr=moonFrac(T),up=smooth((m.alt+1)/5);
+    // Steht der Mond am Himmel, liegt der Strahl unter ihm. Sonst wie bei Lichtzeit ein schwächerer Mondlichtstrahl, der mit der Nacht von links nach rechts wandert. Die Stärke folgt der Mondphase.
+    const a0=T<ST.rise?ST.prevSet:ST.set,b0=T<ST.rise?ST.rise:ST.nextRise,p=clamp((T-a0)/(b0-a0),0,1);
+    out.push({x:lerp(lerp(40,500,p),skyX(m.az),up),str:(1-dk)*lerp(.26+.2*fr,.3+.4*fr,up),col:[212,222,242],mond:true})}
+  return out}
+function seeStrahl(S,ts,beams,wind){const sh=.6+.4*clamp(wind,.5,3);
+  // wie Lichtzeit: ein weicher Schein plus glitzernde Streifen, je Zeile verschieden breit und seitlich versetzt; fern schmal, nah breit
+  for(const b of beams){if(b.str<.01)continue;const k=b.mond?2.6:1; // auf dem dunklen Nachtsee braucht der Mondstrahl mehr Licht, um sichtbar zu sein
+    for(const c of S.lake){const u=c.u,hw=9+u*55+u*u*55,rw=.4+.6*Math.abs(Math.sin(c.j*7.13)),wv=hw*rw,jx=Math.sin(c.j*12.9+ts*.6*sh)*wv*.3*(.3+u),
+      soft=Math.exp(-(((c.x-b.x)/(hw*1.5))**2)),dx=c.x-(b.x+jx),strip=Math.exp(-((dx/wv)**2)*2.2);if(soft<.03&&strip<.03)continue;
+      const tw=.35+.65*(.5+.5*Math.sin(ts*1.1*sh*c.f+c.j*1.93+c.ph*.3)),v=Math.sin(ts*c.f*2.1+c.ph*3);
+      let a=k*b.str*((1-u*.3)*(.12*soft+.3*strip*tw));S.add(c.k,b.col,a);
+      // Glitzerpunkte: deckend, damit sie auch auf dem hellen Tagessee funkeln
+      if(v>.82&&strip>.15)S.glow(c.i,c.j,mix(b.col,[255,255,255],.5),Math.min(1,(v-.82)/.18*strip*b.str*1.7*Math.sqrt(k)))}}}
+
 // ---------- Licht der Tageszeit nach echtem Sonnenstand ----------
 const NACHT=[.22,.25,.38],NACHT_DAEMMER=[.42,.43,.58];
 function lightAt(T,d){const s=sunPos(T),a=s.alt,morning=s.az<0,ST=sunTimes(d);
@@ -441,32 +490,112 @@ function lightAt(T,d){const s=sunPos(T),a=s.alt,morning=s.az<0,ST=sunTimes(d);
   else if(a>=-6){const k=smooth(-a/6);tint=mix(dusk,NACHT_DAEMMER,k);night=lerp(.2,.75,k)}
   else if(a>=-12){const k=smooth((-a-6)/6);tint=mix(NACHT_DAEMMER,NACHT,k);night=lerp(.75,1,k)}
   else{tint=NACHT;night=1}
-  let lx,ly;const sunUp=T>=ST.rise&&T<=ST.set;
-  if(sunUp){const p=clamp((T-ST.rise)/(ST.set-ST.rise),0,1);lx=lerp(40,500,p);ly=lerp(330,40,Math.sin(p*Math.PI))}
-  else{const a0=T<ST.rise?ST.prevSet:ST.set,b0=T<ST.rise?ST.rise:ST.nextRise,p=clamp((T-a0)/(b0-a0),0,1);lx=lerp(500,40,p);ly=60}
-  return{tint,night,lx,ly,amp:lerp(.2,.1,night),alt:a,sunUp,ST}}
+  // Lichtwellen gehen von der Sonne aus, nachts vom Mondstrahl
+  const sunUp=T>=ST.rise&&T<=ST.set,beams=strahlen(T,ST,s);let lx,ly;
+  if(sunUp){lx=skyX(s.az);ly=lerp(165,40,smooth(a/35))}else{lx=beams.length?beams[beams.length-1].x:W/2;ly=60}
+  return{tint,night,lx,ly,amp:lerp(.2,.1,night),alt:a,sunUp,ST,beams}}
+
+// ---------- Wir bewegen uns mit (aus der Vorlage): Wind auf Annas Haaren, Korbgras, Reisbündeln und Valeries Kleid, kleine Bewegungen, Schimmer ----------
+// Positionen in Foto-Koordinaten. Verschiebungen sind in Vorlagen-Zellen (6 Foto-Pixel) angegeben und werden mit m = 6·s auf das aktuelle Raster gebracht. Gesichter bleiben ruhig.
+const FAM={hop:-1,korb:-1,stange:-1,next:0,idx:0};
+function famSetup(S){const B=S.B;if(!B.anna||!B.max||!B.valerie||!S.plate)return null;
+  const who=(x,y)=>{const v=S.at(B.valerie,x,y)*255,a=S.at(B.anna,x,y)*255,m=S.at(B.max,x,y)*255;if(v>110)return'v';if(a>110&&a>=m)return'a';if(m>110)return'm';return null};
+  const P={a:[],m:[],v:[]},C=S.cols;
+  for(let j=0;j<S.rows;j++)for(let i=0;i<C;i++){const k=j*C+i;if(!S.fam[k])continue;const x=S.px(i+.5),y=S.py(j+.5),w=who(x,y);if(!w)continue;
+    const c={i,j,k,x,y,tag:''};
+    if(w==='a'){if(y<212)c.tag='gras';else if(x>98&&x<218&&y>330&&y<458&&(((x-160)/30)**2+((y-386)/42)**2)>1)c.tag='haar';else if(y<335&&x>40&&x<262)c.tag='korb'}
+    if(w==='m'){if(x>190&&x<260&&y>368&&y<456)c.tag='buendelL';else if(x>384&&x<476&&y>368&&y<460)c.tag='buendelR';else if(y<380)c.tag='oben'}
+    if(w==='v'){if(y>752&&y<872)c.tag='kleid'}
+    P[w].push(c)}
+  return P}
+function famMotion(S,ts){const P=S.parts;if(!P||!BEWEGUNG.an)return;const cr=S.cr,C=S.cols,R=S.rows,base=S.base,pl=S.plate,w=WX_wind(),m=6*S.s;
+  // kleine Bewegungen im Wechsel (Valerie hüpft, Anna rückt den Korb, Max wippt die Stange), alle 20–40 s laut config.json, nicht während eines Gags
+  if(!FAM.next)FAM.next=ts+lerp(BEWEGUNG.min,BEWEGUNG.max,Math.random());
+  if(ts>FAM.next){if(EV.some(e=>e.type!=='ducks'&&e.type!=='night'))FAM.next=ts+5;else{const k=['hop','korb','stange'][FAM.idx++%3];FAM[k]=ts;FAM.next=ts+lerp(BEWEGUNG.min,BEWEGUNG.max,Math.random())}}
+  const since=k=>FAM[k]<0||ts<FAM[k]?99:ts-FAM[k];
+  const hop=since('hop'),korb=since('korb'),st=since('stange');
+  const vy=hop<.9?Math.round(m*(-1.4*Math.max(0,Math.sin(Math.min(hop,.45)/.45*Math.PI))-1.4*Math.max(0,Math.sin(Math.max(0,hop-.45)/.45*Math.PI)))):0;
+  const ky=korb<1.2?Math.round(m*(korb<.25?-1:korb<.9?-1+(Math.sin(korb*18)>.6?1:0):0)):0,kx=korb<1.2&&korb>.25&&korb<.9?Math.round(m*(Math.sin(korb*9)>0?1:0)):0;
+  const sy=st<1?Math.round(m*(Math.sin(st*Math.PI*2*1.5)>.3?1:0)):0;
+  const kick=st<4?Math.exp(-st*.9)*1.6:0,kickK=korb<3?Math.exp(-korb*1.2)*.8:0,affe=running('monkey',ts)>=0;
+  const disp=(c,who)=>{let dx=0,dy=0;const t=c.tag;
+    if(t==='haar')dx=m*.7*w*Math.sin(ts*2.1+c.y*.0417)*clamp((c.y-330)/125,0,1);
+    if(t==='gras')dx=m*(1.1*w+kickK*2)*Math.sin(ts*1.6+c.x*.02)*Math.pow(clamp((212-c.y)/110,0,1),1.1);
+    if((t==='buendelL'||t==='buendelR')&&!(affe&&t==='buendelR')){const L=t==='buendelL',pv=L?[225,365]:[430,365],th=(.05*w+.09*kick)*Math.sin(ts*(L?1.35:1.2)+(L?0:1.3));dx=(c.y-pv[1])*S.s*Math.sin(th)}
+    if(t==='kleid')dx=m*.55*w*Math.sin(ts*3.1+c.y*.1)*clamp((c.y-752)/120,0,1);
+    if(who==='v')dy+=vy;
+    if(who==='a'&&(t==='korb'||t==='gras')){dy+=ky;dx+=kx}
+    if(who==='m'&&(t==='oben'||t==='buendelL'||t==='buendelR'))dy+=sy;
+    return[Math.round(dx),Math.round(dy)]};
+  // 1) alle bewegten Zellen zuerst mit dem leeren Hintergrund füllen; hebt Anna den Korb, kommt darunter ihr Kopf zum Vorschein, nicht der Himmel
+  const moved=[];
+  for(const who of['a','m','v'])for(const c of P[who]){const [dx,dy]=disp(c,who);if(dx||dy){moved.push([c,dx,dy]);const o=c.k*3;
+    const under=who==='a'&&dy<0&&(c.tag==='korb'||c.tag==='gras')&&c.j+1<R?(c.k+C)*3:-1;
+    if(under>=0){cr[o]=base[under];cr[o+1]=base[under+1];cr[o+2]=base[under+2]}else{cr[o]=pl[o];cr[o+1]=pl[o+1];cr[o+2]=pl[o+2]}}}
+  // 2) dann an der neuen Stelle zeichnen (Reihenfolge: Anna, Max, Valerie vorne)
+  for(const [c,dx,dy] of moved){const ni=c.i+dx,nj=c.j+dy;if(ni<0||nj<0||ni>=C||nj>=R)continue;const o=c.k*3,n=(nj*C+ni)*3;cr[n]=base[o];cr[n+1]=base[o+1];cr[n+2]=base[o+2]}
+  // 3) leichter Schimmer in Kleidung und Haaren (abschaltbar in config.json)
+  if(BEWEGUNG.schimmer)for(const who of['a','m','v'])for(const c of P[who]){if(!c.tag&&who!=='v')continue;if(who==='v'&&c.y<690)continue;
+    const f=1+.07*Math.sin(ts*1.7-(c.x*.02+c.y*.012))*Math.sin(ts*.9+c.x*.05);const o=c.k*3;cr[o]*=f;cr[o+1]*=f;cr[o+2]*=f}}
+
+// ---------- Pauli jagt die Enten (aus der Vorlage): Positionen in Foto-Koordinaten, Füße unten mittig ----------
+// Figuren werden nach vorne größer (mindestens so groß wie in der Vorlage). Was vorne läuft (y > 860), ist vor uns, was hinten läuft, hinter uns.
+const DOG={pal:{B:[178,114,62],b:[150,94,50],D:[118,72,38],W:[178,114,62],K:[16,12,10],P:[236,110,130]},
+  runA:["...BB.........","..BBBB........",".DKBBBBBBBBBBB","DDBBBBBBBBBBBB",".PWWBBBBBBBBB.","..WWBbBBBBBb..","..B..B....B..B",".W...W...W...W"],
+  runB:["...BB.........","..BBBB........",".DKBBBBBBBBBBB","DDBBBBBBBBBBBB",".PWWBBBBBBBBB.","..WWBbBBBBBb..","...BB.....BB..","...WW.....WW.."],
+  sit:["...BB....","..BBBB...",".DKBBB...","DDBBBBB..",".PWWBBBB.","..WWBBBB.","..WWBBBBB",".WW.WBBW."],
+  sitW:["...BB....","..BBBB...",".DKBBB...","DDBBBBB..",".PWWBBBB.","..WWBBBBB","..WWBBBB.",".WW.WBBW."]};
+const DUCKP={W:{W:[246,242,232],O:[236,150,50],F:[228,132,46]},B:{W:[150,112,76],O:[236,150,50],F:[228,132,46]},Y:{W:[246,214,90],O:[236,150,50],F:[228,132,46]},
+  a:["OW..",".W..",".WW.",".WWW","..WW",".F.F"],b:["OW..",".W..",".WW.",".WWW","..WW","..F."],flap:["OW..","WW.W",".WWW","WWWW","..WW",".F.F"],
+  ka:["OW",".W","F."],kb:["OW",".W",".F"],kflap:["OW","WW","F."]};
+const zTief=y=>y<=540?1:y>=720?2:Math.round((1+smooth((y-540)/180))*4)/4,vorn=y=>y>860;
+function figur(S,rows,pal,x,y,z,flip,front){const w=rows[0].length,h=rows.length;S.sprite(rows,S.ci(x)-S.sz(w,z)/2,S.cj(y)-S.sz(h,z),1,flip,front,z,pal)}
+function pfad(e,pts){if(e<=pts[0][0])return[pts[0][1],pts[0][2],0];for(let i=1;i<pts.length;i++){const[a,ax,ay]=pts[i-1],[b,bx,by]=pts[i];if(e<=b){const k=smooth((e-a)/(b-a));return[lerp(ax,bx,k),lerp(ay,by,k),bx-ax]}}const L=pts[pts.length-1];return[L[1],L[2],0]}
+const PDUCKS=[{o:0,p:'W',pts:[[4.5,0,530],[8.6,120,890],[11,120,890],[13.5,-90,880]]},{o:42,p:'B',pts:[[4.5,0,530],[8.2,500,905],[11.5,500,905],[14,640,900]]},
+  {o:84,p:'W',pts:[[4.5,0,530],[7.5,-80,600]]},{o:126,p:'W',pts:[[4.5,0,530],[8,300,945],[10.5,300,945],[13,-90,940]]}];
+function pauliSzene(S,ts){const e=running('pauli',ts);if(e<0)return;
+  // Enten: erst gemütlich, dann aufgescheucht mit Ausrufezeichen in alle Richtungen bis in den Vordergrund
+  const walkX=o=>620-Math.min(e,4.5)*30+o;
+  PDUCKS.forEach((d,q)=>{let x,y,dx=-1,panic=e>=4.5;
+    if(!panic){x=walkX(d.o);y=530}else{const p0=[...d.pts];p0[0]=[4.5,walkX(d.o),530];[x,y,dx]=pfad(e,p0);x+=Math.sin(e*9+q)*6*(e<11?1:0);y-=Math.abs(Math.sin(e*14+q))*5*(e<11?1:0)}
+    if(x<-60||x>620)return;const z=zTief(y),fr=panic?(Math.floor(e*10+q)%2?'flap':'a'):(Math.floor(e*3.2+q)%2?'a':'b');
+    figur(S,DUCKP[fr],DUCKP[d.p],x,y,z,dx>0,vorn(y));
+    if(panic&&e<6.2)figur(S,["W","W",".","W"],{W:[255,255,255]},x,y-S.sz(6,z)/S.s-6,1,false,vorn(y))});
+  // Küken: rennt erst im Kreis, dann als Letztes hinterher
+  {let x,y,dx;if(e<4.5){x=walkX(160);y=532;dx=-1}else if(e<11){x=520+Math.sin((e-4.5)*3)*60;y=560+Math.sin((e-4.5)*1.7)*30;dx=Math.cos((e-4.5)*3)}else{[x,y,dx]=pfad(e,[[11,520+Math.sin(6.5*3)*60,560+Math.sin(6.5*1.7)*30],[15,660,600]])}
+   const fr=e>=4.5?(Math.floor(e*12)%2?'kflap':'ka'):(Math.floor(e*3.2)%2?'ka':'kb');if(x<620)figur(S,DUCKP[fr],DUCKP.Y,x,y,zTief(y),dx>0,vorn(y))}
+  // Pauli: kommt hinten rechts, jagt nach vorne, setzt sich hechelnd vor uns, rennt raus
+  const P=[[2.8,650,532],[5,430,535],[7,330,900],[8.6,160,882],[9.6,232,905],[13.2,232,905],[15.8,-90,900]];
+  if(e>2.8&&e<15.8){const[x,y,dx]=pfad(e,P),sitting=e>9.6&&e<13.2,z=zTief(y);
+    if(sitting)figur(S,Math.floor(e*6)%2?DOG.sit:DOG.sitW,DOG.pal,x,y,z,false,vorn(y));
+    else figur(S,Math.floor(e*8)%2?DOG.runA:DOG.runB,DOG.pal,x,y,z,dx>0,vorn(y))}}
 
 // ---------- Das Bild. Alle Positionen in Foto-Koordinaten (540×960), erst beim Zeichnen in Zellen umgerechnet ----------
-function build(col,msk){
+function build(B){
   const r=rng(5);
   const flies=Array.from({length:28},(_,n)=>({x:lerp(10,530,r()),y:lerp(560,930,r()),ph:r()*6.28,f:lerp(.4,1,r()),ta:n/28*Math.PI*2,tr:lerp(.85,1.1,r())}));
-  const stars=Array.from({length:80},()=>({x:lerp(5,535,r()),y:lerp(5,320,r()),ph:r()*6.28}));
+  const stars=Array.from({length:80},()=>({x:lerp(5,535,r()),y:lerp(5,168,r()),ph:r()*6.28}));
   const drops=Array.from({length:260},()=>({x:r()*1.1-.05,o:r()*170,v:lerp(55,80,r())}));
   const RDROPS=Array.from({length:200},()=>({x:r()*1.1-.05,o:r()*170,v:lerp(60,85,r())}));
   const buts=Array.from({length:7},(_,n)=>{const c=BUTCOL[n%BUTCOL.length];return{c,pal:{c,l:mix(c,[255,255,255],.35),B:[40,34,30]},ph:r()*6.28,f:lerp(.7,1.3,r()),ox:lerp(-14,14,r()),oy:lerp(-12,8,r())}});
   let bundle=null,sparkle=[];
-  return engine(col,msk,{seed:31,wind:WX_wind,
+  return engine(B,{seed:31,wind:WX_wind,famMove:famMotion,
     init(S){
+      S.parts=famSetup(S);
       bundle=S.region((x,y)=>x>=398&&x<=474&&y>=298&&y<=458&&!(y>=350&&y<=372),(i,j)=>{let ii=Math.round(S.ci(482));while(ii<S.cols-1&&S.fam[j*S.cols+ii])ii++;const o=(j*S.cols+ii)*3;return[S.base[o],S.base[o+1],S.base[o+2]]})},
     look:(S,ts)=>{const T=curT(),d=wall(T),L=lightAt(T,d);schedule(ts,L,d);
       let {tint,night,lx,ly,amp}=L;
       const wx=wxNow();if(wx.rainNow){tint=mix(tint,[.76,.8,.88],.85);amp=.09}
       const rn=running('rain',ts);if(rn>=0){const k=env(rn,0,13,2,3);tint=mix(tint,[.7,.75,.84],k);amp=lerp(amp,.08,k)}
+      // Regen dämpft den Lichtstrahl auf dem See
+      let beams=L.beams;{const dim=(wx.rainNow?.45:1)*(rn>=0?lerp(1,.4,env(rn,0,13,2,3)):1);if(dim<1)beams=beams.map(b=>({...b,str:b.str*dim}))}
       // Gute Nacht: für die Dauer des Moments sanft abendlich, auch wenn die Sonne noch scheint
-      const gn=running('night',ts);if(gn>=0){const k=env(gn,0,32,4,6);tint=mix(tint,NACHT_DAEMMER,k*.85);night=Math.max(night,k*.55);amp=lerp(amp,.1,k);lx=lerp(lx,75,k);ly=lerp(ly,230,k)}
-      return{lx:Math.round(lx),ly:Math.round(ly),amp,tint,night,famLift:lerp(.35,.42,night),alt:L.alt,sunUp:L.sunUp,d,T,ST:L.ST,
+      const gn=running('night',ts);if(gn>=0){const k=env(gn,0,32,4,6);tint=mix(tint,NACHT_DAEMMER,k*.85);night=Math.max(night,k*.55);amp=lerp(amp,.1,k);lx=lerp(lx,27,k);ly=lerp(ly,123,k)}
+      return{lx:Math.round(lx),ly:Math.round(ly),amp,tint,night,famLift:lerp(.35,.42,night),alt:L.alt,sunUp:L.sunUp,d,T,ST:L.ST,beams,
         hhmm:String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0'),gridCol:night>.5?[8,9,16]:undefined}},
     gags(S,ts,L){const n=L.night,day=L.sunUp,d=L.d,wx=wxNow(),{ci,cj,sz,F}=S,cols=S.cols,rows=S.rows;
+      // ---- Lichtstrahl auf dem See ----
+      seeStrahl(S,ts,L.beams,WX_wind());
       // ---- echter Regen draußen = Regen im Bild; hört er tagsüber auf: Regenbogen mit Einhorn ----
       const regen=(Q,a1,a2,a3)=>{for(const q of Q){const y=(((ts*q.v+q.o)%175)-5)*rows/160,xx=q.x*cols+y*.12+(a3?wx.wind*.004*y:0);S.glow(xx,y,[226,236,255],a1);S.glow(xx-.12,y-1,[226,236,255],a2);if(a3===undefined)S.glow(xx-.24,y-2,[226,236,255],a1*.27)}};
       if(wx.rainNow)regen(RDROPS,.55,.3,true);
@@ -477,14 +606,14 @@ function build(col,msk){
       if(n>.3||gk>0){const cx=330,cy=600;for(const f of flies){let x0=f.x+18*Math.sin(ts*f.f*.6+f.ph),y0=f.y+12*Math.sin(ts*f.f*.8+f.ph*1.3);
         if(gk>0){const a=f.ta+ts*.25,tx=cx+Math.cos(a)*250*f.tr,ty=cy+Math.sin(a)*300*f.tr;x0=lerp(x0,tx,gk);y0=lerp(y0,ty,gk)}
         const v=Math.max(0,Math.sin(ts*f.f*2.2+f.ph)),a=Math.max(n,gk)*(.35+.65*v);S.glow(ci(x0),cj(y0),[255,236,120],a,false);if(v>.6)S.glow(ci(x0)+1,cj(y0),[255,226,110],a*.45)}}
-      // Sternschnuppen (Foto-Koordinaten): unterhalb von Uhr, Symbolen und Lichterkette, damit nichts verdeckt wird
-      const shoot=(t0,x0,y0,x1,y1)=>{const p=(ts-t0)/1.4;if(p<0||p>1.25)return;for(let q=0;q<9;q++){const pp=p-q*.04;if(pp<0||pp>1)continue;S.glow(ci(lerp(x0,x1,pp)),cj(lerp(y0,y1,pp)),[255,250,230],(1-q/9)*(p>1?1-(p-1)*4:1),true)}};
-      if(gn>=0){const t0=EV.find(e=>e.type==='night').t0;shoot(t0+8,36,204,336,312);shoot(t0+19,516,216,264,336)}
-      else if(n>.6){if(ts>nextShoot+1.6)nextShoot=ts+lerp(12,25,Math.random());shoot(nextShoot,60+((nextShoot*42)%240),204,360+((nextShoot*18)%150),312)}
-      // ---- Gute Nacht: Mond geht links auf ----
-      if(gn>=0){const k=env(gn,0,32,1,5),rise=smooth(gn/9),mx=ci(60),my=cj(lerp(384,216,rise)),mc=sz(2.5);
-        for(let a=0;a<24;a++){const an=a/24*Math.PI*2;S.glow(mx+mc+Math.cos(an)*4.2*F,my+mc+Math.sin(an)*4.2*F,[230,230,210],k*.18,true)}
-        S.glowSprite('moon',mx,my,k*.95)}
+      // Sternschnuppen (Foto-Koordinaten) nur im Himmel: links unter den Symbolen, rechts unter der Uhr; am Vulkanhang verschwinden sie dahinter
+      const shoot=(t0,x0,y0,x1,y1)=>{const p=(ts-t0)/1.4;if(p<0||p>1.25)return;for(let q=0;q<9;q++){const pp=p-q*.04;if(pp<0||pp>1)continue;S.glowK(ci(lerp(x0,x1,pp)),cj(lerp(y0,y1,pp)),[255,250,230],(1-q/9)*(p>1?1-(p-1)*4:1),2)}};
+      if(gn>=0){const t0=EV.find(e=>e.type==='night').t0;shoot(t0+8,6,96,118,126);shoot(t0+19,538,98,466,102)}
+      else if(n>.6){if(ts>nextShoot+1.6)nextShoot=ts+lerp(12,25,Math.random());const v=(nextShoot*7)%20;if(Math.floor(nextShoot)%2)shoot(nextShoot,538,97+v*.1,466,101+v*.1);else shoot(nextShoot,4+v,94+v*.2,116+v,124+v*.2)}
+      // ---- Gute Nacht: der Mond steigt links hinter dem Vulkanhang auf (nur im Himmel sichtbar) ----
+      if(gn>=0){const k=env(gn,0,32,1,5),rise=smooth(gn/9),mx=ci(12),my=cj(lerp(176,108,rise)),mc=sz(2.5);
+        for(let a=0;a<24;a++){const an=a/24*Math.PI*2;S.glowK(mx+mc+Math.cos(an)*4.2*F,my+mc+Math.sin(an)*4.2*F,[230,230,210],k*.18,2)}
+        S.glowSprite('moon',mx,my,k*.95,false,false,1,2)}
       // ---- tagsüber: Silberreiher, zwei Schmetterlinge im Feld ----
       if(day){
         const e=((ts+6)%26),A=[ci(40),cj(600)],B=[ci(470),cj(470)],hop=27*F;
@@ -499,6 +628,8 @@ function build(col,msk){
       const de=running('ducks',ts);if(de>=0){const lead=ci(W+12-de*25.2),row=Math.round(cj(530)),step=Math.floor(de*3.2)%2,dj=row-sz(6)+1;
         [[0,'duck'],[6,'bduck'],[12,'duck'],[18,'duck']].forEach(([o,nm],q)=>S.sprite(nm+((step+q)%2?'A':'B'),lead+o*F,dj));
         const k=de%8,gap=k<6?2+k*1.1:2+8.6*(1-smooth((k-6)/2)),fast=k>=6;S.sprite('kid'+((Math.floor(de*(fast?8:3.2)))%2?'A':'B'),lead+(22+gap)*F,row-sz(3)+1)}
+      // ---- Pauli jagt die Enten ----
+      pauliSzene(S,ts);
       // ---- Hut lüften ----
       const he=running('hat',ts);if(he>=0){const h=Math.round(3*F);if(he<2.4)S.hat(S.HV,Math.round(h*Math.sin(Math.PI*he/2.4)));if(he>=3.6&&he<6)S.hat(S.HM,Math.round(h*Math.sin(Math.PI*(he-3.6)/2.4)))}
       // ---- Affe klaut ein Reisbündel von Max' Stange und bringt es zurück ----
@@ -551,8 +682,10 @@ async function entschluesseln(){
   const key=await crypto.subtle.importKey('raw',raw,'AES-GCM',false,['decrypt']);
   let pt;try{pt=new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:buf.subarray(8,20)},key,buf.subarray(20)));}catch(e){throw new Error('Schlüssel passt nicht');}
   const hl=((pt[0]<<24)|(pt[1]<<16)|(pt[2]<<8)|pt[3])>>>0,hdr=JSON.parse(new TextDecoder().decode(pt.subarray(4,4+hl)));
-  let o=4+hl;const foto=pt.subarray(o,o+hdr.foto.laenge);o+=hdr.foto.laenge;const maske=pt.subarray(o,o+hdr.maske.laenge);
-  return Promise.all([loadBytes(foto,hdr.foto.typ),loadBytes(maske,hdr.maske.typ)]);}
+  // Reihenfolge im Paket: Foto, Gesamtmaske, dann die weiteren Bilder (Personen-Masken, See, leeres Hintergrundbild) wie im Kopf aufgeführt
+  let o=4+hl;const teil=h=>{const b=pt.subarray(o,o+h.laenge);o+=h.laenge;return loadBytes(b,h.typ)};
+  const foto=teil(hdr.foto),maske=teil(hdr.maske),weitere=(Array.isArray(hdr.weitere)?hdr.weitere:[]).map(h=>teil(h).then(im=>[h.name,im]));
+  const [fb,mb,...w]=await Promise.all([foto,maske,...weitere]);return{bilder:[fb,mb],extra:Object.fromEntries(w)};}
 
 // ---------- Ausstellungsmodus: Bildschirm wach halten, täglich 4:00 neu laden (die Adresse samt Schlüssel bleibt erhalten) ----------
 let wake=null;
@@ -578,7 +711,7 @@ let draw=null,STATUS='',lastTxt='',lastDraw=0,fpsN=0,fpsT=0,fpsW=0;
 function setBtns(){$('now').classList.toggle('on',!playing&&!T_SIM);$('play').classList.toggle('on',playing);$('play').textContent=playing?'Anhalten':'Zeitraffer';
   document.querySelectorAll('[data-wx]').forEach(b=>b.classList.toggle('on',b.dataset.wx===WX.mode));document.querySelectorAll('[data-tonne]').forEach(b=>b.classList.toggle('on',b.dataset.tonne===TONNE_DEMO));}
 function readout(L,ts){const d=L.d,ds=d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}),tm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');
-  const cel=[];cel.push('Sonne '+(+L.alt.toFixed(1))+'°, Aufgang '+fmtHM(L.ST.rise)+', Untergang '+fmtHM(L.ST.set)+(L.sunUp?' (Tag)':' (Nacht)'));
+  const cel=[];cel.push('Sonne '+(+L.alt.toFixed(1))+'°, Aufgang '+fmtHM(L.ST.rise)+', Untergang '+fmtHM(L.ST.set)+(L.sunUp?' (Tag)':' (Nacht)'));{const m=moonPos(curT());cel.push('Mond '+(+m.alt.toFixed(1))+'°, '+Math.round(moonFrac(curT())*100)+' % beleuchtet'+(m.alt>0?'':', unter dem Horizont'));}
   cel.push(wxText());cel.push(szeneText(ts));const cd=countdownJetzt(d);if(cd)cel.push('Countdown '+cd.c.name+': noch '+Math.ceil((1-cd.p)*15)+' von 15 Birnen');
   const tn=tonneJetzt(d);cel.push('Tonne: '+(tn?tn.t.name+(TONNE_DEMO?' (Vorschau)':tn.heute?' heute':' morgen'):'keine')+' · nächste: '+tonneText(d));
   if(STATUS)cel.push(STATUS);if(CFG_INFO)cel.push(CFG_INFO);if(T_SIM&&!playing)cel.push('Zeit simuliert');if(URL_INFO.length)cel.push(URL_INFO.join(', '));
@@ -606,16 +739,19 @@ function initDev(){if(initDev.done)return;initDev.done=true;
     if(nm==='night'){start('night',ts);return;}
     const T=curT(),L=lightAt(T,wall(T));if(!L.sunUp&&nm!=='ducks'){simAt(today(12,0,0));setBtns();}
     for(let i=EV.length-1;i>=0;i--)if(EV[i].type!=='ducks'&&nm!=='ducks')EV.splice(i,1);start(nm,ts);if(nm!=='ducks')nextGag=ts+SCN[nm].dur+lerp(SZENEN.min,SZENEN.max,Math.random())*60;});
+  document.querySelectorAll('[data-fam]').forEach(b=>b.onclick=()=>{FAM[b.dataset.fam]=performance.now()/1000;});
 }
-window.__wd={get EV(){return EV},start,RELOAD,neuLaden,curT,sunTimes,tonneJetzt,countdownJetzt,setDev,get status(){return STATUS},get draw(){return draw},get raster(){return{CP,GP,COLS,ROWS,Z,ZF}}};
+window.__wd={get EV(){return EV},start,FAM,moonPos,moonFrac,RELOAD,neuLaden,curT,sunTimes,tonneJetzt,countdownJetzt,setDev,get status(){return STATUS},get draw(){return draw},get raster(){return{CP,GP,COLS,ROWS,Z,ZF}}};
 
 // ---------- Start: Einstellungen, dann Wetter (gespeicherter Stand sofort) und Entschlüsseln parallel ----------
 function startBild(res){if(started)return;started=true;urlAnzeige();fit();
-  if(res&&res.bilder){const [img,maskImg]=res.bilder;BILD={col:pixels(img,W*SS,H*SS),msk:pixels(maskImg,W,H)};draw=build(BILD.col,BILD.msk);STATUS='Foto entschlüsselt';}
+  if(res&&res.bilder){const [img,maskImg]=res.bilder,x=res.extra||{},p=im=>im?pixels(im,W,H):null;
+    BILD={col:pixels(img,W*SS,H*SS),msk:pixels(maskImg,W,H),anna:p(x.anna),max:p(x.max),valerie:p(x.valerie),see:p(x.see),leer:p(x.leer)};draw=build(BILD);
+    const fehlt=['anna','max','valerie','see','leer'].filter(k=>!x[k]);STATUS='Foto entschlüsselt'+(fehlt.length?' (ohne '+fehlt.join(', ')+')':'');}
   else{draw=leer();STATUS='Kein gültiger Schlüssel: '+(res&&res.fehler?res.fehler:'Foto bleibt verborgen')+'. Es bleibt beim leeren Raster.';console.warn(STATUS);}
   if(devOn){initDev();setBtns();}keepAwake();requestAnimationFrame(frame);}
 function boot(){if(WX.mode==='echt'){wxLoad();wxFetch();}
-  return entschluesseln().then(bilder=>({bilder}),e=>({fehler:e.message}));}
+  return entschluesseln().catch(e=>({fehler:e.message}));}
 setTimeout(()=>startBild(null),12000); // Sicherheitsnetz: das Bild startet auf jeden Fall
 try{loadConfig().then(boot).then(startBild,()=>startBild(null));}catch(e){startBild(null);}
 </script>

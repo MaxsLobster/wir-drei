@@ -9,3 +9,6 @@ maske.png
 schluessel*
 .DS_Store
 .claude/
+
+# Arbeitsdateien und Vorlagen bleiben lokal (enthalten das Foto)
+vorlage*.html
